@@ -185,6 +185,12 @@ Lomba matematika membutuhkan platform digital untuk mengelola pendaftaran pesert
 - Tersedia juga **form tambah soal manual** satu-per-satu (bukan hanya lewat import file) sebagai pelengkap/fallback — untuk soal yang gagal parsing otomatis atau revisi soal individual.
 - Soal yang mengandung gambar/diagram (termasuk rumus matematika kompleks yang di-Word ditulis sebagai gambar/equation object) diekstrak sebagai gambar dan ditampilkan apa adanya di preview & saat soal disajikan ke peserta — sistem tidak mengonversi rumus jadi teks/LaTeX.
 
+### FR-A10: Konfigurasi Randomize Soal
+- Saat admin menambah, mengedit, atau mengimpor soal ke dalam bank soal, tersedia opsi berupa checkbox "Randomize / Acak Urutan Soal" (atau tingkatannya disesuaikan: per babak / per set soal).
+### Logika Sistem:
+- Jika checkbox dicentang: Urutan soal (dan/atau opsi jawaban jika diperlukan) yang disajikan ke setiap peserta pada babak tersebut akan diacak secara independen per peserta.
+- Jika checkbox tidak dicentang: Urutan soal disajikan secara fixed / statis sesuai nomor urut yang ada di bank soal.
+
 **Asumsi format dokumen** (perlu dikonfirmasi dengan contoh file asli — lihat Open Questions):
 - Setiap soal diawali penomoran urut (misal `1.`, `2.`, dst.)
 - 4 opsi jawaban diberi label `A)` `B)` `C)` `D)` (atau `A.` `B.` dst.)
@@ -225,7 +231,7 @@ Lomba matematika membutuhkan platform digital untuk mengelola pendaftaran pesert
 | `participants` | Data identitas peserta: nama, sekolah, kategori, kelas |
 | `rounds` | **Baru** — Babak lomba: nama (Penyisihan 1/2, Final), mode (online/offline), status (belum_dibuka/aktif/ditutup), durasi timer, ambang batas tab-switch, per kategori |
 | `qualifications` | **Baru** — Status kelulusan peserta per babak: `participant_id`, `round_id`, `status` (lolos/tidak_lolos/belum_ditentukan), `decided_by_admin_id`, `decided_at` |
-| `questions` | Bank soal, terikat ke `round_id` + kategori, opsi jawaban, kunci jawaban, `image_url` (opsional, untuk soal bergambar/rumus kompleks) |
+| `questions` | Bank soal, terikat ke `round_id` + kategori, opsi jawaban, kunci jawaban, `image_url` (opsional, untuk soal bergambar/rumus kompleks), is_randomized (boolean) untuk soal apakah di acak apa tidak |
 | `quiz_sessions` | Satu sesi pengerjaan quiz **per babak**: `participant_id`, `round_id`, waktu mulai/selesai, status, skor, jumlah tab-switch |
 | `answers` | Jawaban peserta per soal (dalam konteks satu `quiz_session`), status flag, waktu jawab |
 | `tab_switch_logs` | Log waktu setiap kejadian tab-switch per `quiz_session` (audit trail) |
