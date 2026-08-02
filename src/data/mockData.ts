@@ -17,90 +17,147 @@ export const ASSET_IMAGES = {
   blueBlob: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDCTyqidp6U2PWyh9ky726fzQ-gSUpdpxRzjJY0JC_NpKxqTF7ryXu4gVXZ1PS-Aqyl4gM3JslEGwkQ-IAXEulW2Vd-DsCh5_WQ5EmjGbHlTZurraYdZInuaXw0rsznRqpKU_QERpCv--Ju710dZ-KKtAHX2yHYuzyroSt63rEwWL9mVb_9flb8hZ6rwChqQY9YGscHcESDyOXaU_Y6WCWqgsnsRs1RRaI1r8E3UzqA5gyc_ZHzeBSejg'
 };
 
+export const COMPETITION_INFO = {
+  title: 'OPTIMA (Olimpiade Prestasi Matematika)',
+  subTitle: 'Se-Pulau Jawa Tingkat SD/MI, SMP/MTs, dan SMA/SMK/MA Sederajat',
+  theme: 'Mathematics and Talent Rising Through Innovation and Excellence (MATRIX)',
+  organizer: 'HIMATIKA Jurusan Matematika - UIN Siber Syekh Nurjati Cirebon',
+  eventSeries: 'Dies Natalis 2026 Jurusan Matematika',
+  
+  timeline: {
+    earlyBird: '05 Agustus – 15 Agustus 2026',
+    reguler: '24 Agustus – 05 September 2026',
+    technicalMeeting: 'Sabtu, 12 September 2026 (09.00 - 12.00 WIB via Zoom)',
+    openingCeremony: 'Senin, 14 September 2026 (08.00 - 10.00 WIB di Auditorium Pascasarjana Lt. 3)',
+    penyisihan: 'Senin, 14 September 2026 (13.00 - 14.30 WIB via Zoom)',
+    final: 'Rabu, 16 September 2026 (09.00 WIB di Kampus UIN Siber Syekh Nurjati Cirebon)',
+    closingCeremony: 'Kamis, 17 September 2026 (08.00 - 12.10 WIB di Auditorium Pascasarjana Lt. 3)'
+  },
+
+  fees: {
+    sd: { earlyBird: 'Rp 35.000', reguler: 'Rp 45.000' },
+    smp: { earlyBird: 'Rp 50.000', reguler: 'Rp 65.000' },
+    sma: { earlyBird: 'Rp 75.000', reguler: 'Rp 90.000' }
+  },
+
+  paymentMethods: [
+    { bank: 'Allobank', accountNo: '082127650600', accountName: 'Shofania Lestari Ahmad' },
+    { bank: 'Gopay', accountNo: '081290066116', accountName: 'Suryana Meilanti' }
+  ],
+
+  contacts: [
+    { category: 'Olimpiade SD/MI', name: 'Ade Lia Rahmaningrum', phone: '0895-4009-05511' },
+    { category: 'Olimpiade SMP/MTs', name: 'Alifah Nur Mutmainah', phone: '0896-7130-9905' },
+    { category: 'Olimpiade SMA/SMK/MA', name: 'Naillatul Fitriah', phone: '0858-7258-3579' }
+  ],
+
+  socials: {
+    instagram: '@dinalis.matematikauinssc',
+    tiktok: '@himatika.uinssc',
+    email: 'himatikauinssc@gmail.com'
+  }
+};
+
 export const INITIAL_ROUNDS: CompetitionRound[] = [
   {
     id: 'round-sd-1',
-    title: 'Penyisihan 1 SD-SMP - Dasar Logika & Aritmatika',
+    title: 'Tahap Penyisihan SD/MI - Daring (25 Soal PG)',
     category: 'SD-SMP',
-    questionCount: 30,
+    questionCount: 25,
     durationMinutes: 60,
     tabSwitchLimit: 3,
     status: 'active',
     executionMode: 'online',
-    startDate: '2026-08-01',
-    startTime: '08:00',
-    endDate: '2026-08-10',
-    endTime: '18:00'
+    startDate: '2026-09-14',
+    startTime: '13:00',
+    endDate: '2026-09-14',
+    endTime: '14:00'
   },
   {
     id: 'round-sd-2',
-    title: 'Final SD-SMP - Master Olimpiade',
+    title: 'Tahap Final SD/MI - Offline Kampus UIN SSC (10 Soal Esai)',
     category: 'SD-SMP',
-    questionCount: 35,
+    questionCount: 10,
     durationMinutes: 90,
     tabSwitchLimit: 1,
     status: 'locked',
     isFinal: true,
     executionMode: 'offline',
-    startDate: '2026-08-15',
+    startDate: '2026-09-16',
     startTime: '09:00',
-    endDate: '2026-08-15',
-    endTime: '14:00',
+    endDate: '2026-09-16',
+    endTime: '10:30',
     isOfflineStarted: false
   },
   {
-    id: 'round-1',
-    title: 'Penyisihan 1 SMA - Logic & Theory',
-    category: 'SMA',
-    questionCount: 45,
-    durationMinutes: 90,
-    tabSwitchLimit: 3,
-    status: 'submitted',
-    executionMode: 'online',
-    startDate: '2026-08-01',
-    startTime: '08:00',
-    endDate: '2026-08-01',
-    endTime: '12:00'
-  },
-  {
-    id: 'round-2',
-    title: 'Penyisihan 2 SMA - High Level',
-    category: 'SMA',
-    questionCount: 30,
-    durationMinutes: 120,
+    id: 'round-smp-1',
+    title: 'Tahap Penyisihan SMP/MTs - Daring (25 Soal PG)',
+    category: 'SD-SMP',
+    questionCount: 25,
+    durationMinutes: 60,
     tabSwitchLimit: 3,
     status: 'active',
     executionMode: 'online',
-    startDate: '2026-08-01',
-    startTime: '08:00',
-    endDate: '2026-08-10',
-    endTime: '18:00'
+    startDate: '2026-09-14',
+    startTime: '13:00',
+    endDate: '2026-09-14',
+    endTime: '14:00'
   },
   {
-    id: 'round-3',
-    title: 'Final Championship SMA',
-    category: 'SMA',
-    questionCount: 50,
-    durationMinutes: 150,
+    id: 'round-smp-2',
+    title: 'Tahap Final SMP/MTs - Offline Kampus UIN SSC (10 Soal Esai)',
+    category: 'SD-SMP',
+    questionCount: 10,
+    durationMinutes: 90,
     tabSwitchLimit: 1,
     status: 'locked',
     isFinal: true,
     executionMode: 'offline',
-    startDate: '2026-08-15',
+    startDate: '2026-09-16',
     startTime: '09:00',
-    endDate: '2026-08-15',
-    endTime: '15:00',
+    endDate: '2026-09-16',
+    endTime: '10:30',
+    isOfflineStarted: false
+  },
+  {
+    id: 'round-sma-1',
+    title: 'Tahap Penyisihan SMA/SMK/MA - Daring (30 Soal PG & Isian)',
+    category: 'SMA',
+    questionCount: 30,
+    durationMinutes: 90,
+    tabSwitchLimit: 3,
+    status: 'active',
+    executionMode: 'online',
+    startDate: '2026-09-14',
+    startTime: '13:00',
+    endDate: '2026-09-14',
+    endTime: '14:30'
+  },
+  {
+    id: 'round-sma-2',
+    title: 'Tahap Final SMA/SMK/MA - Offline Kampus (3 Esai & Presentasi)',
+    category: 'SMA',
+    questionCount: 3,
+    durationMinutes: 105,
+    tabSwitchLimit: 1,
+    status: 'locked',
+    isFinal: true,
+    executionMode: 'offline',
+    startDate: '2026-09-16',
+    startTime: '09:00',
+    endDate: '2026-09-16',
+    endTime: '13:30',
     isOfflineStarted: false
   }
 ];
 
-export const MOCK_QUESTIONS: Question[] = Array.from({ length: 40 }).map((_, idx) => {
+export const MOCK_QUESTIONS: Question[] = Array.from({ length: 30 }).map((_, idx) => {
   const num = idx + 1;
   if (num === 12) {
     return {
       id: 12,
-      code: 'GEOMETRI • SULIT',
-      text: 'Sebuah tabung tanah liat pejal memiliki jari-jari 4 cm dan tinggi 10 cm. Jika tabung ini dibentuk ulang menjadi sebuah bola sempurna, berapakah volume bola tersebut?',
+      code: 'GEOMETRI • MATRIX OPTIMA',
+      text: 'Sebuah tabung pejal memiliki jari-jari 4 cm dan tinggi 10 cm. Jika tabung ini dibentuk ulang menjadi sebuah bola sempurna, berapakah volume bola tersebut?',
       note: 'Catatan: Asumsikan tidak ada volume yang hilang selama proses pembentukan ulang. Gunakan π ≈ 3.14.',
       diagramUrl: ASSET_IMAGES.cylinderSphere,
       figLabel: 'GAMBAR 12A',
@@ -115,7 +172,7 @@ export const MOCK_QUESTIONS: Question[] = Array.from({ length: 40 }).map((_, idx
   }
   return {
     id: num,
-    code: num % 2 === 0 ? 'ALJABAR • SEDANG' : 'TEORI BILANGAN • MUDAH',
+    code: num % 2 === 0 ? 'ALJABAR • OPTIMA 2026' : 'TEORI BILANGAN • MATRIX',
     text: `Soal ${num}: Hitunglah nilai dari ekspresi polinomial P(x) = x^${(num % 5) + 2} + ${num}x - ${(num * 3) % 17} ketika x = 3.`,
     note: 'Pilih jawaban yang menyatakan nilai tepat.',
     options: [
@@ -133,8 +190,8 @@ export const INITIAL_PARTICIPANTS: Participant[] = [
     id: 'p1',
     rank: 1,
     name: 'Ahmad Firdaus',
-    school: 'SMPN 1 Jakarta',
-    score: 98,
+    school: 'SDN 1 Cirebon',
+    score: 96,
     tabSwitches: 0,
     status: 'qualified',
     category: 'SD-SMP'
@@ -143,8 +200,8 @@ export const INITIAL_PARTICIPANTS: Participant[] = [
     id: 'p2',
     rank: 2,
     name: 'Siti Aminah',
-    school: 'SMP Lab School',
-    score: 95,
+    school: 'SMPN 1 Bandung',
+    score: 92,
     tabSwitches: 1,
     status: 'qualified',
     category: 'SD-SMP'
@@ -153,7 +210,7 @@ export const INITIAL_PARTICIPANTS: Participant[] = [
     id: 'p3',
     rank: 3,
     name: 'Andi Pratama',
-    school: 'SMA Negeri 8 Jakarta',
+    school: 'SMAN 1 Cirebon',
     score: 94,
     tabSwitches: 0,
     status: 'qualified',
@@ -163,8 +220,8 @@ export const INITIAL_PARTICIPANTS: Participant[] = [
     id: 'p4',
     rank: 4,
     name: 'Clarissa Maharani',
-    school: 'SMA Kristen 1 Penabur',
-    score: 92,
+    school: 'SMA Kristen 1 BPK Penabur',
+    score: 90,
     tabSwitches: 0,
     status: 'qualified',
     category: 'SMA'
@@ -173,19 +230,9 @@ export const INITIAL_PARTICIPANTS: Participant[] = [
     id: 'p21',
     rank: 21,
     name: 'Budi Santoso',
-    school: 'SMP Al-Azhar',
-    score: 82,
+    school: 'SMP Al-Azhar Cirebon',
+    score: 78,
     tabSwitches: 2,
-    status: 'disqualified',
-    category: 'SD-SMP'
-  },
-  {
-    id: 'p99',
-    rank: 99,
-    name: 'Peserta Tidak Dikenal',
-    school: 'SMP Negeri 04',
-    score: 10,
-    tabSwitches: 14,
     status: 'disqualified',
     category: 'SD-SMP'
   }
@@ -205,15 +252,7 @@ export const INITIAL_PARSED_QUESTIONS: ParsedQuestion[] = [
   },
   {
     id: 'Q02',
-    questionText: 'Format tidak dikenali: Blok pertanyaan terdeteksi tetapi tag penutup tidak ditemukan.',
-    options: [],
-    key: '?',
-    isError: true,
-    errorMessage: 'Gagal memproses berkas...'
-  },
-  {
-    id: 'Q03',
-    questionText: 'Berapakah jumlah sudut dalam pada bangun segi delapan beraturan (lihat diagram gambar)?',
+    questionText: 'Berapakah jumlah sudut dalam pada bangun segi delapan beraturan?',
     options: [
       { key: 'A', text: '1080°' },
       { key: 'B', text: '1440°' },
