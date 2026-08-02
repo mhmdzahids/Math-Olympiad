@@ -29,7 +29,6 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
   };
 
   const [expandedRoundId, setExpandedRoundId] = useState<string>('round-2');
-  const [hoveredRoundId, setHoveredRoundId] = useState<string | null>(null);
   const [selectedCategoryTab, setSelectedCategoryTab] = useState<'SD-SMP' | 'SMA'>('SD-SMP');
   const [isEditingSettings, setIsEditingSettings] = useState<boolean>(false);
   const [openCategoryDropdownId, setOpenCategoryDropdownId] = useState<string | null>(null);
@@ -497,26 +496,25 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
               {currentRounds
                 .filter((r) => (r.category || 'SMA') === selectedCategoryTab)
                 .map((round) => {
-                  const isClickedExpanded = expandedRoundId === round.id;
-                  const isHovered = hoveredRoundId === round.id;
-                  const isExpanded = isClickedExpanded || isHovered;
+                  const isExpanded = expandedRoundId === round.id;
                   const isOffline = round.executionMode === 'offline';
                   const isSdSmp = round.category === 'SD-SMP';
 
                   return (
                     <div
                       key={round.id}
-                      onMouseEnter={() => setHoveredRoundId(round.id)}
-                      onMouseLeave={() => setHoveredRoundId(null)}
                       className={`rounded-2xl p-4 border transition-all relative ${
                         isExpanded
                           ? 'bg-[#fef9ef] border-[#feaf83]/30 ring-2 ring-[#feaf83]/20 shadow-md'
                           : 'bg-[#f5f0e0] border-[#0a0a0a]/10 hover:bg-[#ebe6d6]'
                       }`}
                     >
-                      <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div
+                        onClick={() => toggleExpand(round.id)}
+                        className="flex items-center justify-between flex-wrap gap-2 cursor-pointer select-none"
+                      >
                         <div className="flex items-center gap-3">
-                          <span className="material-symbols-outlined text-[#6a6a6a] cursor-move">
+                          <span className="material-symbols-outlined text-[#6a6a6a] cursor-move" onClick={(e) => e.stopPropagation()}>
                             drag_indicator
                           </span>
                           <div>
@@ -547,7 +545,11 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                         </div>
 
                         <button
-                          onClick={() => toggleExpand(round.id)}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleExpand(round.id);
+                          }}
                           className="p-1.5 hover:bg-[#ebe6d6] rounded-lg transition-colors text-[#0a0a0a] cursor-pointer"
                         >
                           <span className={`material-symbols-outlined transition-transform duration-300 ${isExpanded ? 'rotate-180' : 'rotate-0'}`}>
