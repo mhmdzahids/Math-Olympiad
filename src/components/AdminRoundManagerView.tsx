@@ -503,7 +503,7 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                   return (
                     <div
                       key={round.id}
-                      className={`rounded-2xl p-4 border transition-all relative ${
+                      className={`rounded-2xl p-4 border transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] relative ${
                         isExpanded
                           ? 'bg-[#fef9ef] border-[#feaf83]/30 ring-2 ring-[#feaf83]/20 shadow-md'
                           : 'bg-[#f5f0e0] border-[#0a0a0a]/10 hover:bg-[#ebe6d6]'
@@ -552,7 +552,7 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                           }}
                           className="p-1.5 hover:bg-[#ebe6d6] rounded-lg transition-colors text-[#0a0a0a] cursor-pointer"
                         >
-                          <span className={`material-symbols-outlined transition-transform duration-300 ${isExpanded ? 'rotate-180' : 'rotate-0'}`}>
+                          <span className={`material-symbols-outlined transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] ${isExpanded ? 'rotate-180' : 'rotate-0'}`}>
                             expand_more
                           </span>
                         </button>
@@ -560,7 +560,7 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
 
                       {/* Expanded Controls with Smooth Accordion Transition */}
                       <div
-                        className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${
+                        className={`grid transition-[grid-template-rows,opacity] duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] ${
                           isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'
                         }`}
                       >
