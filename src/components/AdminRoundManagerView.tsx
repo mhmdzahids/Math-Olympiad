@@ -338,14 +338,15 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
         {/* Section 1: Dynamic Round Manager */}
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
           <div className="lg:col-span-2 space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-3">
               <div>
                 <h2 className="text-2xl sm:text-3xl font-extrabold text-[#0a0a0a] tracking-tight">
                   Manajer Babak
                 </h2>
                 <p className="text-sm text-[#6a6a6a]">Atur, urutkan, dan kelola babak kompetisi SD-SMP & SMA.</p>
               </div>
-              <div className="flex items-center gap-3 shrink-0">
+
+              <div className="flex items-center gap-3 flex-wrap">
                 {/* Button 1 Slot: Pengaturan Babak <-> Batalkan */}
                 <button
                   type="button"
