@@ -1,8 +1,8 @@
 # Product Requirements Document (PRD)
 ## Platform Lomba Matematika Online
 
-**Versi:** 1.2 — menambahkan fitur import soal dari file Word (.docx) per kategori & babak
-**Tanggal:** 29 Juli 2026
+**Versi:** 1.3 — babak menjadi jumlah fleksibel (bukan fixed 3) dengan auto-labeling "Final" pada babak terakhir; menambahkan FR-A10 (randomize soal) dan `is_randomized` di data model
+**Tanggal:** 1 Agustus 2026
 **Status:** Draft
 
 ---
@@ -10,27 +10,30 @@
 ## 1. Ringkasan Produk
 
 ### 1.1 Latar Belakang
-Lomba matematika membutuhkan platform digital untuk mengelola pendaftaran peserta, penyajian soal, pengerjaan quiz dengan batas waktu, dan penilaian hasil secara otomatis, berjalan lintas **3 babak/sesi** kompetisi. Platform ini menggantikan proses manual (kertas/Google Form) dengan sistem yang bisa mendeteksi kecurangan dasar (berpindah tab) dan memberi admin visibilitas penuh atas jalannya lomba di setiap babak.
+Lomba matematika membutuhkan platform digital untuk mengelola pendaftaran peserta, penyajian soal, pengerjaan quiz dengan batas waktu, dan penilaian hasil secara otomatis, berjalan lintas **beberapa babak/sesi** kompetisi yang jumlahnya bisa disesuaikan panitia. Platform ini menggantikan proses manual (kertas/Google Form) dengan sistem yang bisa mendeteksi kecurangan dasar (berpindah tab) dan memberi admin visibilitas penuh atas jalannya lomba di setiap babak.
 
 ### 1.2 Tujuan
 - Menyediakan sistem ujian online yang adil, sulit dicurangi, dan mudah dipakai peserta dari berbagai jenjang (SD-SMP dan SMA).
 - Memberi panitia (admin) kontrol penuh: memonitor peserta real-time, menilai otomatis, mengelola kelulusan antar babak, dan mengekspor data hasil.
-- Mendukung struktur **3 babak berjenjang**:
+- Mendukung struktur **babak berjenjang dengan jumlah fleksibel** — admin bisa menambah, menghapus, dan mengurutkan ulang babak sesuai kebutuhan lomba (tidak dihardcode ke jumlah tertentu). Contoh konfigurasi tipikal:
   1. **Babak Penyisihan 1** — online (peserta dari lokasi masing-masing)
   2. **Babak Penyisihan 2** — online (peserta dari lokasi masing-masing)
-  3. **Babak Final** — offline (seluruh peserta dalam satu venue/jaringan)
+  3. *(opsional, bisa ditambah lebih banyak babak penyisihan sesuai kebutuhan)*
+  4. **Babak Final** — babak paling terakhir dalam urutan, mode-nya (online/offline) ditentukan admin (tipikal: offline, seluruh peserta dalam satu venue/jaringan)
+- **Babak yang berada di posisi terakhir dalam urutan otomatis diberi label "Final"** oleh sistem — admin tidak perlu mengetik nama ini manual, dan label ini otomatis berpindah kalau admin menambah/menghapus/menggeser urutan babak.
 - Hanya peserta yang **lolos** dari babak sebelumnya yang bisa mengakses babak berikutnya.
 
 ### 1.3 Target Pengguna
 | Peran | Deskripsi |
 |---|---|
 | Peserta | Siswa SD-SMP atau SMA yang mendaftar dan mengerjakan quiz di tiap babak sesuai status kelulusannya |
-| Admin/Panitia | Mengelola soal per babak, memonitor peserta, menilai, menentukan kelulusan antar babak, dan mengekspor data |
+| Admin/Panitia | Mengelola soal per babak, memonitor peserta, menilai, menentukan kelulusan antar babak, mengatur jumlah & urutan babak, dan mengekspor data |
 
 ### 1.4 Skala & Asumsi
 - Estimasi hingga **100 peserta bersamaan** dalam satu babak (jumlah peserta menyusut di babak lanjutan karena sistem gugur).
-- Babak Penyisihan 1 & 2 (online): peserta tersebar dari berbagai jaringan/lokasi.
-- Babak Final (offline): peserta berada dalam satu jaringan (WiFi/venue), sehingga bisa berbagi IP publik yang sama.
+- Jumlah babak **tidak tetap** — ditentukan admin per pelaksanaan lomba (minimal 1 babak, tidak ada batas atas yang di-hardcode, meski secara praktis wajar berkisar 2-5 babak).
+- Babak selain yang terakhir (Penyisihan 1, 2, dst.) tipikalnya online: peserta tersebar dari berbagai jaringan/lokasi.
+- Babak Final (posisi terakhir dalam urutan) tipikalnya offline: peserta berada dalam satu jaringan (WiFi/venue), sehingga bisa berbagi IP publik yang sama. Namun mode babak (online/offline) tetap dikonfigurasi eksplisit oleh admin per babak, bukan diasumsikan otomatis dari posisi.
 - **Asumsi kelulusan** (perlu dikonfirmasi — lihat Open Questions): kelulusan antar babak ditentukan **manual oleh admin** berdasarkan ranking skor per kategori, bukan otomatis oleh sistem. Sistem hanya menyediakan data ranking; keputusan akhir "siapa yang lolos" tetap keputusan panitia (misalnya karena ada pertimbangan non-skor).
 - Setiap babak punya bank soal, durasi, dan (berpotensi) aturan tab-switch tersendiri — dikonfigurasi terpisah oleh admin.
 
@@ -41,7 +44,8 @@ Lomba matematika membutuhkan platform digital untuk mengelola pendaftaran pesert
 ### 2.1 Termasuk Dalam Scope (v1)
 - Registrasi & login peserta
 - Pembagian kategori: SD-SMP dan SMA
-- **Struktur 3 babak** (Penyisihan 1, Penyisihan 2, Final) dengan bank soal & konfigurasi terpisah per babak
+- **Struktur babak dengan jumlah fleksibel** (bukan hardcode 3) — admin bisa tambah/hapus/urutkan babak, dengan bank soal & konfigurasi terpisah per babak
+- **Auto-labeling "Final"** pada babak di posisi terakhir dalam urutan, otomatis berpindah saat urutan babak berubah
 - **Status kelulusan per peserta per babak** (lolos / tidak lolos / belum ditentukan)
 - **Gerbang akses babak**: peserta hanya bisa mengerjakan babak yang sedang aktif DAN yang mereka lolos untuk mengikutinya
 - **Import soal dari file Word (.docx)** per kategori & per babak, dengan tahap preview sebelum soal masuk ke bank soal aktif
@@ -142,9 +146,11 @@ Lomba matematika membutuhkan platform digital untuk mengelola pendaftaran pesert
 - Login terpisah dari peserta, akun dibuat manual (lihat FR-P1 note).
 
 ### FR-A2: Manajemen Babak
-- Admin bisa melihat daftar 3 babak (Penyisihan 1, Penyisihan 2, Final) dengan status masing-masing: `belum_dibuka`, `aktif`, `ditutup`.
+- Admin bisa melihat daftar babak (jumlahnya **fleksibel**, bukan hardcode 3) dengan status masing-masing: `belum_dibuka`, `aktif`, `ditutup`.
+- Admin bisa **menambah babak baru** (kapan saja, tidak dibatasi harus di awal), **menghapus babak**, dan **mengubah urutan babak** (reorder), dengan konfirmasi tambahan jika babak yang akan dihapus sudah punya soal atau data peserta.
+- **Auto-labeling "Final"**: babak yang berada di **posisi terakhir** dalam urutan otomatis diberi label/badge "Final" oleh sistem. Ini dihitung ulang otomatis setiap kali admin menambah, menghapus, atau menggeser urutan babak — admin tidak pernah mengetik nama "Final" secara manual. Babak selain yang terakhir tetap bisa diberi nama bebas oleh admin (misal "Babak Penyisihan 1", "Babak Penyisihan 2", dst.).
 - Admin **membuka/menutup babak** secara manual — hanya satu babak yang boleh `aktif` per kategori pada satu waktu (sistem mencegah 2 babak aktif bersamaan untuk kategori yang sama, untuk menghindari kebingungan status peserta).
-- Admin mengatur konfigurasi tiap babak: durasi timer, ambang batas tab-switch, bank soal yang dipakai.
+- Admin mengatur konfigurasi tiap babak: nama (kecuali babak terakhir, yang labelnya otomatis), mode (online/offline — dikonfigurasi eksplisit, tidak diasumsikan dari posisi), durasi timer, ambang batas tab-switch, bank soal yang dipakai.
 - **Selector babak** tersedia di seluruh halaman admin (dashboard, daftar peserta, detail peserta) untuk berpindah konteks antar babak.
 
 ### FR-A3: Panel Kelulusan Antar Babak
@@ -161,7 +167,7 @@ Lomba matematika membutuhkan platform digital untuk mengelola pendaftaran pesert
 
 ### FR-A5: Detail Peserta
 - Tabel/list peserta pada babak yang dipilih, dengan filter (kategori, status).
-- Detail per peserta: identitas lengkap (nama, sekolah, kelas, email), **riwayat lintas babak** (skor & status di Penyisihan 1, Penyisihan 2, Final), status sesi babak aktif, waktu mulai/selesai, jumlah tab-switch, dan (opsional) log waktu setiap kejadian tab-switch.
+- Detail per peserta: identitas lengkap (nama, sekolah, kelas, email), **riwayat lintas seluruh babak** yang ada (skor & status kelulusan per babak, sesuai jumlah babak yang dikonfigurasi admin), status sesi babak aktif, waktu mulai/selesai, jumlah tab-switch, dan (opsional) log waktu setiap kejadian tab-switch.
 
 ### FR-A6: Penilaian
 - Skor dihitung otomatis oleh sistem berdasarkan jawaban benar/salah (asumsi: pilihan ganda, tidak perlu penilaian manual), dihitung terpisah per babak.
@@ -177,13 +183,19 @@ Lomba matematika membutuhkan platform digital untuk mengelola pendaftaran pesert
 - Kemampuan untuk manual override status sesi peserta tertentu (misal: force-end karena masalah teknis di luar kendali peserta, atau reset sesi jika terjadi bug) — termasuk override status kelulusan jika ada koreksi.
 
 ### FR-A9: Import Soal dari File Word (.docx)
-- Sebelum upload, admin **wajib memilih kategori** (SD-SMP / SMA) dan **babak** (Penyisihan 1 / Penyisihan 2 / Final) yang dituju — soal hasil import otomatis ter-tag ke kombinasi ini.
+- Sebelum upload, admin **wajib memilih kategori** (SD-SMP / SMA) dan **babak** (dipilih dari daftar babak yang sudah dikonfigurasi di FR-A2, termasuk babak yang otomatis berlabel "Final") yang dituju — soal hasil import otomatis ter-tag ke kombinasi ini.
 - Admin upload satu file `.docx` berisi kumpulan soal (format terstruktur — lihat asumsi format di bawah).
 - Sistem mem-parsing dokumen dan menampilkan **halaman preview** berisi seluruh soal yang berhasil dideteksi (teks soal, 4 opsi jawaban, jawaban benar yang terdeteksi) — **belum masuk ke bank soal aktif** pada tahap ini.
 - Soal yang gagal diparsing (format tidak sesuai/ambigu) ditandai jelas secara visual di preview, dengan opsi bagi admin untuk **edit manual langsung di preview** atau **skip** soal tsb.
 - Admin meninjau preview, melakukan koreksi bila perlu, lalu klik "Konfirmasi & Simpan" untuk memasukkan seluruh soal yang sudah divalidasi ke bank soal.
 - Tersedia juga **form tambah soal manual** satu-per-satu (bukan hanya lewat import file) sebagai pelengkap/fallback — untuk soal yang gagal parsing otomatis atau revisi soal individual.
 - Soal yang mengandung gambar/diagram (termasuk rumus matematika kompleks yang di-Word ditulis sebagai gambar/equation object) diekstrak sebagai gambar dan ditampilkan apa adanya di preview & saat soal disajikan ke peserta — sistem tidak mengonversi rumus jadi teks/LaTeX.
+
+### FR-A10: Konfigurasi Randomize Soal
+- Saat admin menambah, mengedit, atau mengimpor soal ke dalam bank soal, tersedia opsi berupa checkbox "Randomize / Acak Urutan Soal" (atau tingkatannya disesuaikan: per babak / per set soal).
+### Logika Sistem:
+- Jika checkbox dicentang: Urutan soal (dan/atau opsi jawaban jika diperlukan) yang disajikan ke setiap peserta pada babak tersebut akan diacak secara independen per peserta.
+- Jika checkbox tidak dicentang: Urutan soal disajikan secara fixed / statis sesuai nomor urut yang ada di bank soal.
 
 **Asumsi format dokumen** (perlu dikonfirmasi dengan contoh file asli — lihat Open Questions):
 - Setiap soal diawali penomoran urut (misal `1.`, `2.`, dst.)
@@ -223,15 +235,17 @@ Lomba matematika membutuhkan platform digital untuk mengelola pendaftaran pesert
 |---|---|
 | `users` | Akun login (peserta/admin), email, password hash, role |
 | `participants` | Data identitas peserta: nama, sekolah, kategori, kelas |
-| `rounds` | **Baru** — Babak lomba: nama (Penyisihan 1/2, Final), mode (online/offline), status (belum_dibuka/aktif/ditutup), durasi timer, ambang batas tab-switch, per kategori |
+| `rounds` | **Baru** — Babak lomba, jumlah fleksibel (bukan hardcode 3): `name` (nullable untuk babak terakhir — lihat catatan di bawah), `order_index` (menentukan urutan & babak mana yang "terakhir"), mode (online/offline), status (belum_dibuka/aktif/ditutup), durasi timer, ambang batas tab-switch, per kategori |
 | `qualifications` | **Baru** — Status kelulusan peserta per babak: `participant_id`, `round_id`, `status` (lolos/tidak_lolos/belum_ditentukan), `decided_by_admin_id`, `decided_at` |
-| `questions` | Bank soal, terikat ke `round_id` + kategori, opsi jawaban, kunci jawaban, `image_url` (opsional, untuk soal bergambar/rumus kompleks) |
+| `questions` | Bank soal, terikat ke `round_id` + kategori, opsi jawaban, kunci jawaban, `image_url` (opsional, untuk soal bergambar/rumus kompleks), is_randomized (boolean) untuk soal apakah di acak apa tidak |
 | `quiz_sessions` | Satu sesi pengerjaan quiz **per babak**: `participant_id`, `round_id`, waktu mulai/selesai, status, skor, jumlah tab-switch |
 | `answers` | Jawaban peserta per soal (dalam konteks satu `quiz_session`), status flag, waktu jawab |
 | `tab_switch_logs` | Log waktu setiap kejadian tab-switch per `quiz_session` (audit trail) |
 | `question_imports` | **Baru** — Log tiap proses import file soal: nama file asli, `round_id`, kategori, jumlah soal berhasil/gagal parsing, admin yang mengimpor, waktu import (audit trail, bukan fungsi kritis) |
 
-**Perubahan kunci dari v1.0:** `quiz_sessions` dan `questions` sekarang terikat ke `round_id`, bukan cuma kategori — satu peserta akan punya hingga 3 `quiz_sessions` (satu per babak yang ia lolos ikuti). Tabel `qualifications` baru menjadi gerbang penentu apakah peserta boleh membuat `quiz_session` baru di babak tertentu.
+**Perubahan kunci dari v1.0:** `quiz_sessions` dan `questions` sekarang terikat ke `round_id`, bukan cuma kategori — satu peserta akan punya sejumlah `quiz_sessions` sebanyak babak yang ia lolos ikuti (jumlahnya mengikuti berapa babak yang dikonfigurasi admin, tidak lagi tetap 3). Tabel `qualifications` baru menjadi gerbang penentu apakah peserta boleh membuat `quiz_session` baru di babak tertentu.
+
+**Catatan label "Final" (v1.3):** Nama babak terakhir **tidak disimpan sebagai teks statis** di kolom `name` — melainkan dihitung di level aplikasi (atau view/query) berdasarkan `order_index` tertinggi per kategori: babak dengan `order_index` terbesar untuk kategori tsb otomatis ditampilkan dengan label "Final", terlepas dari apa isi kolom `name`-nya. Ini memastikan label selalu konsisten walau admin menambah/menghapus/reorder babak, tanpa perlu batch-update manual ke banyak row saat urutan berubah.
 
 *(Skema detail SQL tersedia terpisah dari diskusi teknis sebelumnya — perlu diperbarui mengikuti perubahan ini.)*
 
@@ -242,8 +256,8 @@ Lomba matematika membutuhkan platform digital untuk mengelola pendaftaran pesert
 **Peserta (berulang untuk setiap babak yang ia lolos ikuti):**
 1. Register/Login → 2. Halaman status babak (cek: babak aktif? lolos? sudah selesai?) → 3. Halaman "Mulai Quiz" (sesuai kategori + babak aktif) → 4. Timer mulai, soal pertama tampil → 5. Navigasi bebas antar soal, jawab/tandai/skip → 6. Submit manual **atau** auto-submit (timeout / tab-switch ≥3) → 7. Halaman "Selesai [Babak]" → kembali ke langkah 2, menunggu babak berikutnya dibuka & keputusan kelulusan
 
-**Admin (berulang untuk setiap babak):**
-1. Login → 2. Pilih/buka babak yang akan berjalan → 3. Dashboard ringkasan babak tsb → 4. Monitor peserta selama babak berlangsung → 5. Tutup babak setelah waktu berakhir → 6. Buka panel kelulusan, tinjau ranking, tandai peserta lolos/tidak → 7. Export CSV babak tsb → 8. Buka babak berikutnya (ulangi dari langkah 2) → 9. Setelah Final selesai, export rekap gabungan seluruh babak
+**Admin (berulang untuk setiap babak, jumlahnya sesuai konfigurasi):**
+1. Login → 2. (Sekali di awal, atau kapan saja) Atur daftar babak: tambah/hapus/urutkan — babak terakhir otomatis berlabel "Final" → 3. Pilih/buka babak yang akan berjalan → 4. Dashboard ringkasan babak tsb → 5. Monitor peserta selama babak berlangsung → 6. Tutup babak setelah waktu berakhir → 7. Buka panel kelulusan, tinjau ranking, tandai peserta lolos/tidak → 8. Export CSV babak tsb → 9. Buka babak berikutnya (ulangi dari langkah 3) → 10. Setelah babak "Final" selesai, export rekap gabungan seluruh babak
 
 ---
 
@@ -271,6 +285,8 @@ Lomba matematika membutuhkan platform digital untuk mengelola pendaftaran pesert
 | Admin lupa menutup babak sebelumnya sebelum membuka babak berikutnya, sesi lama masih bisa diakses | Validasi status babak sebagai bagian dari FR-A2, beri konfirmasi eksplisit saat admin membuka babak baru |
 | Parsing otomatis dari Word salah membaca soal/opsi/jawaban benar karena format dokumen tidak konsisten | Wajib tahap **preview** sebelum soal masuk bank aktif (FR-A9); soal gagal parsing ditandai jelas untuk dikoreksi manual, bukan diam-diam salah |
 | Rumus matematika atau diagram dalam soal rusak/hilang saat proses import | Rumus/gambar diekstrak dan ditampilkan sebagai gambar apa adanya (bukan dikonversi ke teks), diverifikasi visual saat tahap preview |
+| Admin menghapus/reorder babak yang sudah punya peserta aktif mengerjakan, menyebabkan sesi peserta jadi tidak valid | Konfirmasi eksplisit sebelum hapus/reorder babak yang punya `quiz_sessions` aktif (FR-A2); idealnya babak yang statusnya `aktif` atau sudah pernah `aktif` tidak bisa dihapus, hanya bisa diarsipkan |
+| Label "Final" berpindah ke babak yang salah karena bug urutan (`order_index`) atau race condition saat reorder | Hitung ulang babak "terakhir" berbasis query `order_index` tertinggi secara real-time (bukan disimpan statis), lihat catatan Data Model |
 
 ---
 
@@ -288,6 +304,9 @@ Lomba matematika membutuhkan platform digital untuk mengelola pendaftaran pesert
 - Untuk Babak Final (offline, satu venue): apakah tetap perlu login individual per peserta, atau ada mode "supervised" tambahan di mana admin/pengawas bisa melihat live status semua peserta di venue dari satu layar?
 - **Format persis file Word soal kamu** (paling krusial untuk FR-A9): bagaimana penomoran soal ditulis, bagaimana opsi A-D diformat, dan yang terpenting — **bagaimana jawaban benar ditandai** di dalam dokumen (bold? warna? simbol seperti tanda bintang? atau kunci jawaban ditulis terpisah di akhir dokumen)? Contoh 2-3 soal asli dari file Word kamu akan sangat membantu memastikan parsing otomatis akurat sejak awal, bukan trial-and-error setelah dikembangkan.
 - Apakah soal-soal kamu mengandung banyak rumus matematika/gambar diagram, atau sebagian besar teks biasa? Ini menentukan seberapa besar effort ekstraksi gambar yang perlu disiapkan.
+- **Batas jumlah babak**: apakah perlu batas atas jumlah babak yang bisa dibuat admin (misal maksimal 6), atau benar-benar tanpa batas? Ini murni pencegahan human error (admin tidak sengaja bikin puluhan babak), bukan batasan teknis.
+- **Babak minimum**: apakah sistem boleh berjalan dengan hanya 1 babak (yang otomatis langsung jadi "Final")? Kalau ya, berarti alur kelulusan (FR-A3) perlu menangani kasus "tidak ada babak sebelumnya untuk dibandingkan".
+- Kalau admin **menghapus babak di tengah urutan** (bukan yang terakhir) setelah ada babak lain sudah berjalan, apakah `qualifications` yang sudah dibuat mengacu ke babak itu perlu ditangani khusus (misal: diarsipkan, bukan dihapus permanen)?
 
 ---
 

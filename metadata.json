@@ -1,0 +1,6 @@
+{
+  "name": "MathOlympiad",
+  "description": "Digital math competition platform featuring student dashboard, focus mode quiz execution with anti-cheat, admin round manager, and live advancement leaderboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
