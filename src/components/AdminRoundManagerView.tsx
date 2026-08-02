@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ScreenView, CompetitionRound, ParsedQuestion } from '../types';
 import { INITIAL_ROUNDS, INITIAL_PARSED_QUESTIONS, ASSET_IMAGES } from '../data/mockData';
 
@@ -28,14 +28,46 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
     }
   };
 
-  const [expandedRoundId, setExpandedRoundId] = useState<string>('round-2');
-  const [selectedCategoryTab, setSelectedCategoryTab] = useState<'SD-SMP' | 'SMA'>('SD-SMP');
+  const [expandedRoundId, setExpandedRoundId] = useState<string>('round-sd-1');
+  const [selectedCategoryTab, setSelectedCategoryTab] = useState<'SD' | 'SMP' | 'SMA'>('SD');
   const [isEditingSettings, setIsEditingSettings] = useState<boolean>(false);
   const [openCategoryDropdownId, setOpenCategoryDropdownId] = useState<string | null>(null);
   const [roundsBackup, setRoundsBackup] = useState<CompetitionRound[] | null>(null);
   const [randomizeOrder, setRandomizeOrder] = useState<boolean>(true);
   const [parsedQuestions, setParsedQuestions] = useState<ParsedQuestion[]>(INITIAL_PARSED_QUESTIONS);
   const [isSaveHighlighted, setIsSaveHighlighted] = useState<boolean>(false);
+  const roundCardsContainerRef = useRef<HTMLDivElement>(null);
+
+  // Click outside card container to auto-save settings
+  useEffect(() => {
+    if (!isEditingSettings) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      const el = target as HTMLElement;
+
+      // Skip auto-save if clicking inside cards container, or clicking control buttons/modals
+      if (
+        (roundCardsContainerRef.current && roundCardsContainerRef.current.contains(target)) ||
+        el.closest('button') ||
+        el.closest('.fixed') ||
+        el.closest('[data-modal="true"]')
+      ) {
+        return;
+      }
+
+      handleSaveEditing(false);
+    };
+
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 150);
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isEditingSettings, currentRounds]);
 
   useEffect(() => {
     if (highlightSaveTrigger && highlightSaveTrigger > 0) {
@@ -78,12 +110,14 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
     if (onEditModeChange) onEditModeChange(false);
   };
 
-  const handleSaveEditing = () => {
+  const handleSaveEditing = (showAlert = false) => {
     setIsEditingSettings(false);
     setIsSaveHighlighted(false);
     setRoundsBackup(null);
     if (onEditModeChange) onEditModeChange(false);
-    alert('Pengaturan babak berhasil disimpan!');
+    if (showAlert) {
+      alert('Pengaturan babak berhasil disimpan!');
+    }
   };
 
   // Edit / Add Question Modal states
@@ -103,6 +137,17 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
     setExpandedRoundId(expandedRoundId === id ? '' : id);
   };
 
+  const handleDeleteRound = (roundId: string, roundTitle: string) => {
+    if (window.confirm(`Apakah Anda yakin ingin menghapus "${roundTitle}"?`)) {
+      const updated = currentRounds.filter((r) => r.id !== roundId);
+      updateRounds(updated);
+      if (expandedRoundId === roundId) {
+        const remaining = updated.filter((r) => r.category === selectedCategoryTab);
+        setExpandedRoundId(remaining[0]?.id || '');
+      }
+    }
+  };
+
   const handleUpdateCategory = (roundId: string, category: string) => {
     if (!isEditingSettings) return;
     const updated = currentRounds.map((r) =>
@@ -115,6 +160,22 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
     if (!isEditingSettings) return;
     const updated = currentRounds.map((r) =>
       r.id === roundId ? { ...r, durationMinutes: duration } : r
+    );
+    updateRounds(updated);
+  };
+
+  const handleUpdateTitle = (roundId: string, title: string) => {
+    if (!isEditingSettings) return;
+    const updated = currentRounds.map((r) =>
+      r.id === roundId ? { ...r, title } : r
+    );
+    updateRounds(updated);
+  };
+
+  const handleUpdateQuestionCount = (roundId: string, count: number) => {
+    if (!isEditingSettings) return;
+    const updated = currentRounds.map((r) =>
+      r.id === roundId ? { ...r, questionCount: count } : r
     );
     updateRounds(updated);
   };
@@ -198,11 +259,11 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
     const rawOpts = pq.options && pq.options.length > 0
       ? pq.options
       : [
-          { key: 'A', text: '' },
-          { key: 'B', text: '' },
-          { key: 'C', text: '' },
-          { key: 'D', text: '' }
-        ];
+        { key: 'A', text: '' },
+        { key: 'B', text: '' },
+        { key: 'C', text: '' },
+        { key: 'D', text: '' }
+      ];
     const opts = rawOpts.map((opt, i) => ({
       ...opt,
       key: letters[i] || `P${i + 1}`
@@ -220,10 +281,10 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
       parsedQuestions.map((q) =>
         q.id === editingQuestion.id
           ? {
-              ...editingQuestion,
-              isError: false,
-              errorMessage: undefined
-            }
+            ...editingQuestion,
+            isError: false,
+            errorMessage: undefined
+          }
           : q
       )
     );
@@ -343,7 +404,7 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                 <h2 className="text-2xl sm:text-3xl font-extrabold text-[#0a0a0a] tracking-tight">
                   Manajer Babak
                 </h2>
-                <p className="text-sm text-[#6a6a6a]">Atur, urutkan, dan kelola babak kompetisi SD-SMP & SMA.</p>
+                <p className="text-sm text-[#6a6a6a]">Atur, urutkan, dan kelola babak kompetisi SD/MI, SMP/MTs, & SMA/SMK/MA.</p>
               </div>
 
               <div className="flex items-center gap-3 flex-wrap">
@@ -351,20 +412,18 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                 <button
                   type="button"
                   onClick={isEditingSettings ? handleCancelEditing : handleStartEditing}
-                  className={`relative overflow-hidden flex items-center justify-center font-bold text-xs sm:text-sm px-4 py-2 rounded-xl transition-all duration-300 ease-out shadow-2xs cursor-pointer border ${
-                    isEditingSettings
-                      ? 'bg-[#ff6b5a]/15 hover:bg-[#ff6b5a]/25 text-[#d32f2f] border-[#ff6b5a]/40'
-                      : 'bg-[#ebe6d6] hover:bg-[#e7e2d8] text-[#0a0a0a] border-transparent'
-                  }`}
+                  className={`relative overflow-hidden flex items-center justify-center font-bold text-xs sm:text-sm px-4 py-2 rounded-xl transition-all duration-300 ease-out shadow-2xs cursor-pointer border ${isEditingSettings
+                    ? 'bg-[#ff6b5a]/15 hover:bg-[#ff6b5a]/25 text-[#d32f2f] border-[#ff6b5a]/40'
+                    : 'bg-[#ebe6d6] hover:bg-[#e7e2d8] text-[#0a0a0a] border-transparent'
+                    }`}
                 >
                   <div className="relative flex items-center justify-center min-h-[20px] min-w-[120px]">
                     {/* Non-editing state content */}
                     <div
-                      className={`flex items-center gap-1.5 transition-all duration-300 ease-out ${
-                        isEditingSettings
-                          ? 'opacity-0 -translate-y-2 pointer-events-none absolute'
-                          : 'opacity-100 translate-y-0 relative'
-                      }`}
+                      className={`flex items-center gap-1.5 transition-all duration-300 ease-out ${isEditingSettings
+                        ? 'opacity-0 -translate-y-2 pointer-events-none absolute'
+                        : 'opacity-100 translate-y-0 relative'
+                        }`}
                     >
                       <span className="material-symbols-outlined text-[18px]">settings</span>
                       <span className="whitespace-nowrap">Pengaturan Babak</span>
@@ -372,11 +431,10 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
 
                     {/* Editing state content */}
                     <div
-                      className={`flex items-center gap-1.5 transition-all duration-300 ease-out ${
-                        isEditingSettings
-                          ? 'opacity-100 translate-y-0 relative'
-                          : 'opacity-0 translate-y-2 pointer-events-none absolute'
-                      }`}
+                      className={`flex items-center gap-1.5 transition-all duration-300 ease-out ${isEditingSettings
+                        ? 'opacity-100 translate-y-0 relative'
+                        : 'opacity-0 translate-y-2 pointer-events-none absolute'
+                        }`}
                     >
                       <span className="material-symbols-outlined text-[18px]">close</span>
                       <span className="whitespace-nowrap">Batalkan</span>
@@ -389,28 +447,32 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                   type="button"
                   onClick={() => {
                     if (isEditingSettings) {
-                      handleSaveEditing();
+                      handleSaveEditing(true);
                     } else {
                       const newCategory = selectedCategoryTab;
                       const categoryCount = currentRounds.filter((r) => r.category === newCategory).length;
+                      const newRoundId = `round-${newCategory.toLowerCase()}-${Date.now()}`;
                       const newR: CompetitionRound = {
-                        id: `round-${currentRounds.length + 1}`,
+                        id: newRoundId,
                         title: `Babak Baru ${newCategory} ${categoryCount + 1}`,
                         category: newCategory,
-                        questionCount: 30,
-                        durationMinutes: 60,
+                        questionCount: newCategory === 'SMA' ? 30 : 25,
+                        durationMinutes: newCategory === 'SMA' ? 90 : 60,
                         tabSwitchLimit: 3,
                         status: 'active',
                         executionMode: 'online'
                       };
+                      setRoundsBackup(JSON.parse(JSON.stringify(currentRounds)));
                       updateRounds([...currentRounds, newR]);
+                      setIsEditingSettings(true);
+                      if (onEditModeChange) onEditModeChange(true);
+                      setExpandedRoundId(newRoundId);
                     }
                   }}
-                  className={`relative overflow-hidden flex items-center justify-center font-bold text-xs sm:text-sm px-4 py-2 rounded-xl transition-all duration-300 ease-out cursor-pointer active:scale-95 border ${
-                    isEditingSettings
-                      ? 'bg-[#a4d4c5] hover:bg-[#a4d4c5]/90 text-[#0a0a0a] border-2 border-[#0a0a0a] shadow-md'
-                      : 'bg-[#0a0a0a] hover:bg-[#1a1a1a] text-white border-transparent shadow-xs'
-                  }`}
+                  className={`relative overflow-hidden flex items-center justify-center font-bold text-xs sm:text-sm px-4 py-2 rounded-xl transition-all duration-300 ease-out cursor-pointer active:scale-95 border ${isEditingSettings
+                    ? 'bg-[#a4d4c5] hover:bg-[#a4d4c5]/90 text-[#0a0a0a] border-2 border-[#0a0a0a] shadow-md'
+                    : 'bg-[#0a0a0a] hover:bg-[#1a1a1a] text-white border-transparent shadow-xs'
+                    }`}
                 >
                   {/* Subtle white blinking overlay when save is highlighted */}
                   {isSaveHighlighted && isEditingSettings && (
@@ -420,11 +482,10 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                   <div className="relative z-10 flex items-center justify-center min-h-[20px] min-w-[135px]">
                     {/* Non-editing state content */}
                     <div
-                      className={`flex items-center gap-1.5 transition-all duration-300 ease-out ${
-                        isEditingSettings
-                          ? 'opacity-0 -translate-y-2 pointer-events-none absolute'
-                          : 'opacity-100 translate-y-0 relative'
-                      }`}
+                      className={`flex items-center gap-1.5 transition-all duration-300 ease-out ${isEditingSettings
+                        ? 'opacity-0 -translate-y-2 pointer-events-none absolute'
+                        : 'opacity-100 translate-y-0 relative'
+                        }`}
                     >
                       <span className="material-symbols-outlined text-[18px]">add</span>
                       <span className="whitespace-nowrap">Tambah Babak Baru</span>
@@ -432,11 +493,10 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
 
                     {/* Editing state content */}
                     <div
-                      className={`flex items-center gap-1.5 transition-all duration-300 ease-out ${
-                        isEditingSettings
-                          ? 'opacity-100 translate-y-0 relative'
-                          : 'opacity-0 translate-y-2 pointer-events-none absolute'
-                      }`}
+                      className={`flex items-center gap-1.5 transition-all duration-300 ease-out ${isEditingSettings
+                        ? 'opacity-100 translate-y-0 relative'
+                        : 'opacity-0 translate-y-2 pointer-events-none absolute'
+                        }`}
                     >
                       <span className="material-symbols-outlined text-[18px]">save</span>
                       <span className="whitespace-nowrap">Simpan Pengaturan</span>
@@ -447,68 +507,58 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
             </div>
 
             {/* Category Selector Buttons Bar */}
-            <div className="bg-[#ebe6d6]/60 p-2 rounded-2xl border border-[#0a0a0a]/10 flex items-center justify-between flex-wrap gap-2">
-              <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
-                <span className="text-xs font-extrabold text-[#0a0a0a] uppercase tracking-wider pl-2 mr-1 flex items-center gap-1 shrink-0">
-                  <span className="material-symbols-outlined text-base">school</span>
-                  Kategori:
-                </span>
-
-                <button
-                  onClick={() => setSelectedCategoryTab('SD-SMP')}
-                  className={`px-3.5 py-2 rounded-xl font-extrabold text-xs flex items-center gap-2 transition-all cursor-pointer border ${
-                    selectedCategoryTab === 'SD-SMP'
-                      ? 'bg-[#ffb084] text-[#0a0a0a] border-[#0a0a0a] shadow-md ring-2 ring-[#ffb084]/50'
-                      : 'bg-white/80 hover:bg-white text-[#0a0a0a] border-[#0a0a0a]/10'
+            <div className="flex items-center gap-2.5 overflow-x-auto py-2 px-1">
+              {/* SD Button */}
+              <button
+                onClick={() => setSelectedCategoryTab('SD')}
+                className={`px-6 py-2 rounded-full font-extrabold text-xs sm:text-sm transition-all cursor-pointer border-0 ${selectedCategoryTab === 'SD'
+                  ? 'bg-[#ffb084] text-[#0a0a0a] ring-2 ring-[#ffb084] ring-offset-2 ring-offset-[#fef9ef] shadow-2xs'
+                  : 'bg-[#ebe6d6] text-[#555d65] hover:bg-[#e2dccb] hover:text-[#0a0a0a]'
                   }`}
-                >
-                  <span className="material-symbols-outlined text-base">child_care</span>
-                  <span>SD - SMP</span>
-                  <span className="px-2 py-0.5 text-[10px] bg-[#0a0a0a]/10 text-[#0a0a0a] rounded-full font-black">
-                    {currentRounds.filter((r) => r.category === 'SD-SMP').length}
-                  </span>
-                </button>
+              >
+                <span>SD / MI</span>
+              </button>
 
-                <button
-                  onClick={() => setSelectedCategoryTab('SMA')}
-                  className={`px-3.5 py-2 rounded-xl font-extrabold text-xs flex items-center gap-2 transition-all cursor-pointer border ${
-                    selectedCategoryTab === 'SMA'
-                      ? 'bg-[#e8b94a] text-[#0a0a0a] border-[#0a0a0a] shadow-md ring-2 ring-[#e8b94a]/50'
-                      : 'bg-white/80 hover:bg-white text-[#0a0a0a] border-[#0a0a0a]/10'
+              {/* SMP Button */}
+              <button
+                onClick={() => setSelectedCategoryTab('SMP')}
+                className={`px-6 py-2 rounded-full font-extrabold text-xs sm:text-sm transition-all cursor-pointer border-0 ${selectedCategoryTab === 'SMP'
+                  ? 'bg-[#b8a4ed] text-[#0a0a0a] ring-2 ring-[#b8a4ed] ring-offset-2 ring-offset-[#fef9ef] shadow-2xs'
+                  : 'bg-[#ebe6d6] text-[#555d65] hover:bg-[#e2dccb] hover:text-[#0a0a0a]'
                   }`}
-                >
-                  <span className="material-symbols-outlined text-base">workspace_premium</span>
-                  <span>SMA</span>
-                  <span className="px-2 py-0.5 text-[10px] bg-[#0a0a0a]/10 text-[#0a0a0a] rounded-full font-black">
-                    {currentRounds.filter((r) => r.category === 'SMA').length}
-                  </span>
-                </button>
-              </div>
+              >
+                <span>SMP / MTs</span>
+              </button>
 
-              <div className="text-xs font-semibold text-[#6a6a6a] px-2 hidden md:block">
-                Menampilkan: <span className="font-extrabold text-[#0a0a0a]">{selectedCategoryTab}</span>
-              </div>
+              {/* SMA Button */}
+              <button
+                onClick={() => setSelectedCategoryTab('SMA')}
+                className={`px-6 py-2 rounded-full font-extrabold text-xs sm:text-sm transition-all cursor-pointer border-0 ${selectedCategoryTab === 'SMA'
+                  ? 'bg-[#e8b94a] text-[#0a0a0a] ring-2 ring-[#e8b94a] ring-offset-2 ring-offset-[#fef9ef] shadow-2xs'
+                  : 'bg-[#ebe6d6] text-[#555d65] hover:bg-[#e2dccb] hover:text-[#0a0a0a]'
+                  }`}
+              >
+                <span>SMA / SMK / MA</span>
+              </button>
             </div>
 
 
 
             {/* Accordion List */}
-            <div className="space-y-3">
+            <div ref={roundCardsContainerRef} className="space-y-3">
               {currentRounds
-                .filter((r) => (r.category || 'SMA') === selectedCategoryTab)
+                .filter((r) => (r.category || 'SD') === selectedCategoryTab)
                 .map((round) => {
                   const isExpanded = expandedRoundId === round.id;
                   const isOffline = round.executionMode === 'offline';
-                  const isSdSmp = round.category === 'SD-SMP';
 
                   return (
                     <div
                       key={round.id}
-                      className={`rounded-2xl p-4 border transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] relative ${
-                        isExpanded
-                          ? 'bg-[#fef9ef] border-[#feaf83]/30 ring-2 ring-[#feaf83]/20 shadow-md'
-                          : 'bg-[#f5f0e0] border-[#0a0a0a]/10 hover:bg-[#ebe6d6]'
-                      }`}
+                      className={`rounded-2xl p-4 border transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] relative ${isExpanded
+                        ? 'bg-[#fef9ef] border-[#feaf83]/30 ring-2 ring-[#feaf83]/20 shadow-md'
+                        : 'bg-[#f5f0e0] border-[#0a0a0a]/10 hover:bg-[#ebe6d6]'
+                        }`}
                     >
                       <div
                         onClick={() => toggleExpand(round.id)}
@@ -521,12 +571,6 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                           <div>
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className="font-bold text-base text-[#0a0a0a]">{round.title}</p>
-                              
-                              {round.isFinal && (
-                                <span className="bg-[#e8b94a] text-[#0a0a0a] text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                                  FINAL
-                                </span>
-                              )}
                               {isOffline ? (
                                 <span className="bg-[#feaf83] text-[#0a0a0a] text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider flex items-center gap-1 shadow-2xs">
                                   <span className="material-symbols-outlined text-[12px]">co_present</span>
@@ -561,340 +605,400 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
 
                       {/* Expanded Controls with Smooth Accordion Transition */}
                       <div
-                        className={`grid transition-[grid-template-rows,opacity] duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] ${
-                          isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'
-                        }`}
+                        className={`grid transition-[grid-template-rows,opacity] duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] ${isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'
+                          }`}
                       >
                         <div className={isExpanded ? 'overflow-visible' : 'overflow-hidden'}>
                           <div className="space-y-4 pt-4 mt-4 border-t border-[#ebe6d6]">
-                          {/* Mode Pelaksanaan Selection */}
-                          <div className="space-y-1.5 bg-[#fffaf0] p-3.5 rounded-xl border border-[#0a0a0a]/10">
-                            <div className="flex items-center justify-between">
-                            <label className="text-[11px] font-black text-[#0a0a0a] uppercase tracking-wider flex items-center gap-1.5">
-                              <span className="material-symbols-outlined text-base text-[#0a0a0a]">tune</span>
-                              <span>MODE PELAKSANAAN BABAK</span>
-                            </label>
-                            {!isEditingSettings && (
-                              <span className="text-[10px] text-[#6a6a6a] font-bold italic flex items-center gap-1">
-                                <span className="material-symbols-outlined text-[12px]">lock</span>
-                                Mode Terkunci
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                            <button
-                              type="button"
-                              disabled={!isEditingSettings}
-                              onClick={() => handleUpdateExecutionMode(round.id, 'online')}
-                              className={`py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border-2 transition-all ${
-                                !isOffline
-                                  ? 'bg-[#b8a4ed] border-[#0a0a0a] text-[#0a0a0a] shadow-xs'
-                                  : 'bg-white border-[#0a0a0a]/15 text-[#6a6a6a]'
-                              } ${!isEditingSettings ? 'cursor-not-allowed opacity-75' : 'cursor-pointer hover:border-[#0a0a0a]'}`}
-                            >
-                              <span className="material-symbols-outlined text-base">laptop_mac</span>
-                              <span>Kuis Online (Laptop Peserta)</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              disabled={!isEditingSettings}
-                              onClick={() => handleUpdateExecutionMode(round.id, 'offline')}
-                              className={`py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border-2 transition-all ${
-                                isOffline
-                                  ? 'bg-[#feaf83] border-[#0a0a0a] text-[#0a0a0a] shadow-xs'
-                                  : 'bg-white border-[#0a0a0a]/15 text-[#6a6a6a]'
-                              } ${!isEditingSettings ? 'cursor-not-allowed opacity-75' : 'cursor-pointer hover:border-[#0a0a0a]'}`}
-                            >
-                              <span className="material-symbols-outlined text-base">co_present</span>
-                              <span>Sesi Offline (Proyektor Kelas)</span>
-                            </button>
-                          </div>
-
-                          {isOffline && (
-                            <div className="bg-[#ffdbca]/50 border border-[#8b4f2b]/20 p-2.5 rounded-lg mt-2 text-[11px] text-[#6e3816] leading-relaxed">
-                              <strong>Catatan Sesi Offline:</strong> Kuis dilaksanakan dengan menayangkan soal di 1 proyektor kelas. Tombol <em>"Mulai Kuis Sekarang"</em> pada Dashboard Siswa otomatis disembunyikan.
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Jadwal Pelaksanaan (Tanggal & Waktu) */}
-                        <div className="space-y-1.5 bg-[#fffaf0] p-3.5 rounded-xl border border-[#0a0a0a]/10">
-                          <div className="flex items-center justify-between">
-                            <label className="text-[11px] font-black text-[#0a0a0a] uppercase tracking-wider flex items-center gap-1.5">
-                              <span className="material-symbols-outlined text-base text-[#0a0a0a]">calendar_clock</span>
-                              <span>PENGATURAN WAKTU & JADWAL UJIAN</span>
-                            </label>
-                          </div>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                            {/* Start Date & Time */}
-                            <div className="space-y-1">
-                              <span className="text-[10px] font-bold text-[#6a6a6a] uppercase block tracking-wider">Tanggal & Jam Mulai</span>
-                              <div className="flex gap-2">
-                                <div className={`flex-1 flex items-center gap-1.5 px-3 py-2 rounded-xl border transition-all ${
-                                  isEditingSettings
-                                    ? 'bg-white border-[#0a0a0a]/30 focus-within:border-[#0a0a0a] focus-within:ring-2 focus-within:ring-[#0a0a0a]/10 shadow-2xs'
+                            {/* Judul Babak & Jumlah Soal Row */}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-[#fffaf0] p-3.5 rounded-xl border border-[#0a0a0a]/10">
+                              <div className="sm:col-span-2 space-y-1">
+                                <label className="text-[11px] font-black text-[#0a0a0a] uppercase tracking-wider flex items-center gap-1.5">
+                                  <span className="material-symbols-outlined text-base text-[#0a0a0a]">edit_note</span>
+                                  <span>NAMA / JUDUL BABAK</span>
+                                </label>
+                                <input
+                                  type="text"
+                                  disabled={!isEditingSettings}
+                                  value={round.title}
+                                  onChange={(e) => handleUpdateTitle(round.id, e.target.value)}
+                                  placeholder="Masukkan Nama Babak..."
+                                  className={`w-full px-3 py-2 text-xs sm:text-sm font-black text-[#0a0a0a] bg-white rounded-xl border transition-all ${isEditingSettings
+                                    ? 'border-[#0a0a0a]/30 focus:border-[#0a0a0a] focus:ring-2 focus:ring-[#0a0a0a]/10 shadow-2xs'
                                     : 'bg-[#ebe6d6]/40 border-transparent cursor-not-allowed opacity-80'
-                                }`}>
-                                  <span className="material-symbols-outlined text-[#6a6a6a] text-base shrink-0">calendar_month</span>
-                                  <input
-                                    type="date"
-                                    disabled={!isEditingSettings}
-                                    value={round.startDate || '2026-08-01'}
-                                    onChange={(e) => handleUpdateSchedule(round.id, 'startDate', e.target.value)}
-                                    className={`w-full text-xs font-black text-[#0a0a0a] bg-transparent focus:outline-none ${
-                                      !isEditingSettings ? 'cursor-not-allowed' : 'cursor-pointer'
                                     }`}
-                                  />
-                                </div>
+                                />
+                              </div>
 
-                                <div className={`w-32 flex items-center gap-1.5 px-2.5 py-2 rounded-xl border transition-all ${
-                                  isEditingSettings
-                                    ? 'bg-white border-[#0a0a0a]/30 focus-within:border-[#0a0a0a] focus-within:ring-2 focus-within:ring-[#0a0a0a]/10 shadow-2xs'
-                                    : 'bg-[#ebe6d6]/40 border-transparent cursor-not-allowed opacity-80'
-                                }`}>
-                                  <span className="material-symbols-outlined text-[#6a6a6a] text-base shrink-0">schedule</span>
+                              <div className="space-y-1">
+                                <label className="text-[11px] font-black text-[#0a0a0a] uppercase tracking-wider flex items-center gap-1.5">
+                                  <span className="material-symbols-outlined text-base text-[#0a0a0a]">format_list_numbered</span>
+                                  <span>JUMLAH SOAL</span>
+                                </label>
+                                <div className={`flex items-center gap-2 border px-3 py-2 rounded-xl bg-white ${isEditingSettings ? 'border-[#0a0a0a]/30' : 'bg-[#ebe6d6]/40 border-transparent cursor-not-allowed opacity-80'
+                                  }`}>
                                   <input
-                                    type="time"
+                                    type="number"
                                     disabled={!isEditingSettings}
-                                    value={round.startTime || '08:00'}
-                                    onChange={(e) => handleUpdateSchedule(round.id, 'startTime', e.target.value)}
-                                    className={`w-full text-xs font-black text-[#0a0a0a] bg-transparent focus:outline-none ${
-                                      !isEditingSettings ? 'cursor-not-allowed' : 'cursor-pointer'
-                                    }`}
+                                    value={round.questionCount}
+                                    onChange={(e) => handleUpdateQuestionCount(round.id, parseInt(e.target.value) || 10)}
+                                    className={`font-black text-xs sm:text-sm bg-transparent border-none focus:outline-none w-full text-[#0a0a0a] ${!isEditingSettings ? 'cursor-not-allowed' : ''
+                                      }`}
                                   />
+                                  <span className="text-xs text-[#6a6a6a] font-bold shrink-0">Soal</span>
                                 </div>
                               </div>
                             </div>
-
-                            {/* End Date & Time */}
-                            <div className="space-y-1">
-                              <span className="text-[10px] font-bold text-[#6a6a6a] uppercase block tracking-wider">Tanggal & Jam Selesai</span>
-                              <div className="flex gap-2">
-                                <div className={`flex-1 flex items-center gap-1.5 px-3 py-2 rounded-xl border transition-all ${
-                                  isEditingSettings
-                                    ? 'bg-white border-[#0a0a0a]/30 focus-within:border-[#0a0a0a] focus-within:ring-2 focus-within:ring-[#0a0a0a]/10 shadow-2xs'
-                                    : 'bg-[#ebe6d6]/40 border-transparent cursor-not-allowed opacity-80'
-                                }`}>
-                                  <span className="material-symbols-outlined text-[#6a6a6a] text-base shrink-0">event_available</span>
-                                  <input
-                                    type="date"
-                                    disabled={!isEditingSettings}
-                                    value={round.endDate || '2026-08-10'}
-                                    onChange={(e) => handleUpdateSchedule(round.id, 'endDate', e.target.value)}
-                                    className={`w-full text-xs font-black text-[#0a0a0a] bg-transparent focus:outline-none ${
-                                      !isEditingSettings ? 'cursor-not-allowed' : 'cursor-pointer'
-                                    }`}
-                                  />
-                                </div>
-
-                                <div className={`w-32 flex items-center gap-1.5 px-2.5 py-2 rounded-xl border transition-all ${
-                                  isEditingSettings
-                                    ? 'bg-white border-[#0a0a0a]/30 focus-within:border-[#0a0a0a] focus-within:ring-2 focus-within:ring-[#0a0a0a]/10 shadow-2xs'
-                                    : 'bg-[#ebe6d6]/40 border-transparent cursor-not-allowed opacity-80'
-                                }`}>
-                                  <span className="material-symbols-outlined text-[#6a6a6a] text-base shrink-0">history_toggle_off</span>
-                                  <input
-                                    type="time"
-                                    disabled={!isEditingSettings}
-                                    value={round.endTime || '18:00'}
-                                    onChange={(e) => handleUpdateSchedule(round.id, 'endTime', e.target.value)}
-                                    className={`w-full text-xs font-black text-[#0a0a0a] bg-transparent focus:outline-none ${
-                                      !isEditingSettings ? 'cursor-not-allowed' : 'cursor-pointer'
-                                    }`}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Offline Execution Control Box */}
-                        {isOffline && (
-                          <div className="bg-[#feaf83]/20 border-2 border-[#feaf83] p-4 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                            <div>
-                              <h4 className="font-extrabold text-sm text-[#0a0a0a] flex items-center gap-1.5">
-                                <span className="material-symbols-outlined text-lg text-[#0a0a0a]">co_present</span>
-                                <span>Kontrol Tayangan Proyektor Sesi Offline</span>
-                              </h4>
-                              <p className="text-xs text-[#6a6a6a] mt-0.5">
-                                Klik tombol di samping untuk mengaktifkan sesi tayangan proyektor di ruang kelas.
-                              </p>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => handleToggleStartOfflineRound(round.id)}
-                              className={`px-5 py-2.5 rounded-xl font-extrabold text-xs flex items-center gap-2 shadow-md transition-all shrink-0 cursor-pointer ${
-                                round.isOfflineStarted
-                                  ? 'bg-[#ff6b5a] text-white hover:bg-[#ff6b5a]/90'
-                                  : 'bg-[#0a0a0a] text-white hover:bg-[#0a0a0a]/80'
-                              }`}
-                            >
-                              <span className="material-symbols-outlined text-base">
-                                {round.isOfflineStarted ? 'pause_circle' : 'play_circle'}
-                              </span>
-                              <span>{round.isOfflineStarted ? 'Hentikan Sesi Babak' : 'Mulai Babak'}</span>
-                            </button>
-                          </div>
-                        )}
-
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                          {/* Kategori Lomba */}
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-[#6a6a6a] uppercase tracking-wider">
-                              KATEGORI LOMBA
-                            </label>
-                            <div className="relative">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (!isEditingSettings) {
-                                    setIsEditingSettings(true);
-                                  }
-                                  setOpenCategoryDropdownId(openCategoryDropdownId === round.id ? null : round.id);
-                                }}
-                                className="w-full flex items-center justify-between px-3 py-2 rounded-xl border border-[#0a0a0a]/20 bg-[#f5f0e0] hover:bg-[#ebe6d6] shadow-2xs cursor-pointer transition-all text-xs font-black text-[#0a0a0a]"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <span className="material-symbols-outlined text-[18px] text-[#0a0a0a]">
-                                    {(round.category || 'SMA') === 'SD-SMP' ? 'child_care' : 'workspace_premium'}
+                            {/* Mode Pelaksanaan Selection */}
+                            <div className="space-y-1.5 bg-[#fffaf0] p-3.5 rounded-xl border border-[#0a0a0a]/10">
+                              <div className="flex items-center justify-between">
+                                <label className="text-[11px] font-black text-[#0a0a0a] uppercase tracking-wider flex items-center gap-1.5">
+                                  <span className="material-symbols-outlined text-base text-[#0a0a0a]">tune</span>
+                                  <span>MODE PELAKSANAAN BABAK</span>
+                                </label>
+                                {!isEditingSettings && (
+                                  <span className="text-[10px] text-[#6a6a6a] font-bold italic flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-[12px]">lock</span>
+                                    Mode Terkunci
                                   </span>
-                                  <span>{(round.category || 'SMA') === 'SD-SMP' ? 'SD - SMP' : 'SMA'}</span>
+                                )}
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                                <button
+                                  type="button"
+                                  disabled={!isEditingSettings}
+                                  onClick={() => handleUpdateExecutionMode(round.id, 'online')}
+                                  className={`py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border-2 transition-all ${!isOffline
+                                    ? 'bg-[#b8a4ed] border-[#0a0a0a] text-[#0a0a0a] shadow-xs'
+                                    : 'bg-white border-[#0a0a0a]/15 text-[#6a6a6a]'
+                                    } ${!isEditingSettings ? 'cursor-not-allowed opacity-75' : 'cursor-pointer hover:border-[#0a0a0a]'}`}
+                                >
+                                  <span className="material-symbols-outlined text-base">laptop_mac</span>
+                                  <span>Kuis Online (Laptop Peserta)</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  disabled={!isEditingSettings}
+                                  onClick={() => handleUpdateExecutionMode(round.id, 'offline')}
+                                  className={`py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border-2 transition-all ${isOffline
+                                    ? 'bg-[#feaf83] border-[#0a0a0a] text-[#0a0a0a] shadow-xs'
+                                    : 'bg-white border-[#0a0a0a]/15 text-[#6a6a6a]'
+                                    } ${!isEditingSettings ? 'cursor-not-allowed opacity-75' : 'cursor-pointer hover:border-[#0a0a0a]'}`}
+                                >
+                                  <span className="material-symbols-outlined text-base">co_present</span>
+                                  <span>Sesi Offline (Proyektor Kelas)</span>
+                                </button>
+                              </div>
+
+                              {isOffline && (
+                                <div className="bg-[#ffdbca]/50 border border-[#8b4f2b]/20 p-2.5 rounded-lg mt-2 text-[11px] text-[#6e3816] leading-relaxed">
+                                  <strong>Catatan Sesi Offline:</strong> Kuis dilaksanakan dengan menayangkan soal di 1 proyektor kelas. Tombol <em>"Mulai Kuis Sekarang"</em> pada Dashboard Siswa otomatis disembunyikan.
                                 </div>
-                                <span className="material-symbols-outlined text-base text-[#0a0a0a]">
-                                  {openCategoryDropdownId === round.id ? 'expand_less' : 'expand_more'}
-                                </span>
-                              </button>
-
-                              {openCategoryDropdownId === round.id && (
-                                <>
-                                  <div
-                                    className="fixed inset-0 z-40"
-                                    onClick={() => setOpenCategoryDropdownId(null)}
-                                  />
-                                  <div className="absolute left-0 mt-2 w-60 bg-white rounded-2xl shadow-2xl border border-[#0a0a0a]/10 p-2 space-y-1 z-50 animate-in fade-in zoom-in-95 duration-150">
-                                    <div className="px-3 py-1.5 text-[10px] font-black uppercase text-[#6a6a6a] tracking-wider border-b border-[#0a0a0a]/5 mb-1">
-                                      Pilih Kategori Lomba
-                                    </div>
-
-                                    {/* SD-SMP Category Option */}
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        if (!isEditingSettings) setIsEditingSettings(true);
-                                        handleUpdateCategory(round.id, 'SD-SMP');
-                                        setOpenCategoryDropdownId(null);
-                                      }}
-                                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
-                                        (round.category || 'SMA') === 'SD-SMP'
-                                          ? 'bg-[#ffb084] text-[#0a0a0a] shadow-2xs border border-[#0a0a0a]/10'
-                                          : 'hover:bg-[#f8f3e9] text-[#0a0a0a]'
-                                      }`}
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-base shrink-0">child_care</span>
-                                        <div className="text-left">
-                                          <div>SD - SMP</div>
-                                          <div className="text-[10px] font-medium text-[#6a6a6a]">Tingkat SD & SMP</div>
-                                        </div>
-                                      </div>
-                                      {(round.category || 'SMA') === 'SD-SMP' && (
-                                        <span className="material-symbols-outlined text-base text-[#0a0a0a] shrink-0">check_circle</span>
-                                      )}
-                                    </button>
-
-                                    {/* SMA Category Option */}
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        if (!isEditingSettings) setIsEditingSettings(true);
-                                        handleUpdateCategory(round.id, 'SMA');
-                                        setOpenCategoryDropdownId(null);
-                                      }}
-                                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
-                                        (round.category || 'SMA') === 'SMA'
-                                          ? 'bg-[#e8b94a] text-[#0a0a0a] shadow-2xs border border-[#0a0a0a]/10'
-                                          : 'hover:bg-[#f8f3e9] text-[#0a0a0a]'
-                                      }`}
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-base shrink-0">workspace_premium</span>
-                                        <div className="text-left">
-                                          <div>SMA</div>
-                                          <div className="text-[10px] font-medium text-[#6a6a6a]">Tingkat SMA / Sederajat</div>
-                                        </div>
-                                      </div>
-                                      {(round.category || 'SMA') === 'SMA' && (
-                                        <span className="material-symbols-outlined text-base text-[#0a0a0a] shrink-0">check_circle</span>
-                                      )}
-                                    </button>
-                                  </div>
-                                </>
                               )}
                             </div>
-                          </div>
 
-                          {/* Durasi Waktu */}
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-[#6a6a6a] uppercase tracking-wider">
-                              DURASI WAKTU
-                            </label>
-                            <div className={`flex items-center gap-2 border px-3 py-2 rounded-xl ${
-                              isEditingSettings ? 'bg-[#fffaf0] border-[#0a0a0a]/20' : 'bg-[#ebe6d6]/40 border-[#0a0a0a]/10 opacity-80'
-                            }`}>
-                              <span className="material-symbols-outlined text-[#6a6a6a] text-[20px]">
-                                timer
-                              </span>
-                              <input
-                                type="number"
-                                disabled={!isEditingSettings}
-                                value={round.durationMinutes}
-                                onChange={(e) =>
-                                  handleUpdateDuration(round.id, parseInt(e.target.value) || 60)
-                                }
-                                className={`font-bold text-sm bg-transparent border-none focus:outline-none w-16 text-[#0a0a0a] ${
-                                  !isEditingSettings ? 'cursor-not-allowed' : ''
-                                }`}
-                              />
-                              <span className="text-xs text-[#6a6a6a] font-semibold">Menit</span>
-                            </div>
-                          </div>
+                            {/* Jadwal Pelaksanaan (Tanggal & Waktu) */}
+                            <div className="space-y-1.5 bg-[#fffaf0] p-3.5 rounded-xl border border-[#0a0a0a]/10">
+                              <div className="flex items-center justify-between">
+                                <label className="text-[11px] font-black text-[#0a0a0a] uppercase tracking-wider flex items-center gap-1.5">
+                                  <span className="material-symbols-outlined text-base text-[#0a0a0a]">calendar_clock</span>
+                                  <span>PENGATURAN WAKTU & JADWAL UJIAN</span>
+                                </label>
+                              </div>
 
-                          {/* Batas Pindah Tab */}
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-[#6a6a6a] uppercase tracking-wider">
-                              BATAS PINDAH TAB
-                            </label>
-                            <div className={`flex items-center gap-2 border px-3 py-2 rounded-xl ${
-                              isEditingSettings ? 'bg-[#fffaf0] border-[#0a0a0a]/20' : 'bg-[#ebe6d6]/40 border-[#0a0a0a]/10 opacity-80'
-                            }`}>
-                              <span className="material-symbols-outlined text-[#6a6a6a] text-[20px]">
-                                security
-                              </span>
-                              <input
-                                type="number"
-                                disabled={!isEditingSettings}
-                                value={round.tabSwitchLimit}
-                                onChange={(e) =>
-                                  handleUpdateTabLimit(round.id, parseInt(e.target.value) || 1)
-                                }
-                                className={`font-bold text-sm bg-transparent border-none focus:outline-none w-12 text-[#0a0a0a] ${
-                                  !isEditingSettings ? 'cursor-not-allowed' : ''
-                                }`}
-                              />
-                              <span className="text-xs text-[#6a6a6a] font-semibold">Kali</span>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                                {/* Start Date & Time */}
+                                <div className="space-y-1">
+                                  <span className="text-[10px] font-bold text-[#6a6a6a] uppercase block tracking-wider">Tanggal & Jam Mulai</span>
+                                  <div className="flex gap-2">
+                                    <div className={`flex-1 flex items-center gap-1.5 px-3 py-2 rounded-xl border transition-all ${isEditingSettings
+                                      ? 'bg-white border-[#0a0a0a]/30 focus-within:border-[#0a0a0a] focus-within:ring-2 focus-within:ring-[#0a0a0a]/10 shadow-2xs'
+                                      : 'bg-[#ebe6d6]/40 border-transparent cursor-not-allowed opacity-80'
+                                      }`}>
+                                      <span className="material-symbols-outlined text-[#6a6a6a] text-base shrink-0">calendar_month</span>
+                                      <input
+                                        type="date"
+                                        disabled={!isEditingSettings}
+                                        value={round.startDate || '2026-08-01'}
+                                        onChange={(e) => handleUpdateSchedule(round.id, 'startDate', e.target.value)}
+                                        className={`w-full text-xs font-black text-[#0a0a0a] bg-transparent focus:outline-none ${!isEditingSettings ? 'cursor-not-allowed' : 'cursor-pointer'
+                                          }`}
+                                      />
+                                    </div>
+
+                                    <div className={`w-32 flex items-center gap-1.5 px-2.5 py-2 rounded-xl border transition-all ${isEditingSettings
+                                      ? 'bg-white border-[#0a0a0a]/30 focus-within:border-[#0a0a0a] focus-within:ring-2 focus-within:ring-[#0a0a0a]/10 shadow-2xs'
+                                      : 'bg-[#ebe6d6]/40 border-transparent cursor-not-allowed opacity-80'
+                                      }`}>
+                                      <span className="material-symbols-outlined text-[#6a6a6a] text-base shrink-0">schedule</span>
+                                      <input
+                                        type="time"
+                                        disabled={!isEditingSettings}
+                                        value={round.startTime || '08:00'}
+                                        onChange={(e) => handleUpdateSchedule(round.id, 'startTime', e.target.value)}
+                                        className={`w-full text-xs font-black text-[#0a0a0a] bg-transparent focus:outline-none ${!isEditingSettings ? 'cursor-not-allowed' : 'cursor-pointer'
+                                          }`}
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* End Date & Time */}
+                                <div className="space-y-1">
+                                  <span className="text-[10px] font-bold text-[#6a6a6a] uppercase block tracking-wider">Tanggal & Jam Selesai</span>
+                                  <div className="flex gap-2">
+                                    <div className={`flex-1 flex items-center gap-1.5 px-3 py-2 rounded-xl border transition-all ${isEditingSettings
+                                      ? 'bg-white border-[#0a0a0a]/30 focus-within:border-[#0a0a0a] focus-within:ring-2 focus-within:ring-[#0a0a0a]/10 shadow-2xs'
+                                      : 'bg-[#ebe6d6]/40 border-transparent cursor-not-allowed opacity-80'
+                                      }`}>
+                                      <span className="material-symbols-outlined text-[#6a6a6a] text-base shrink-0">event_available</span>
+                                      <input
+                                        type="date"
+                                        disabled={!isEditingSettings}
+                                        value={round.endDate || '2026-08-10'}
+                                        onChange={(e) => handleUpdateSchedule(round.id, 'endDate', e.target.value)}
+                                        className={`w-full text-xs font-black text-[#0a0a0a] bg-transparent focus:outline-none ${!isEditingSettings ? 'cursor-not-allowed' : 'cursor-pointer'
+                                          }`}
+                                      />
+                                    </div>
+
+                                    <div className={`w-32 flex items-center gap-1.5 px-2.5 py-2 rounded-xl border transition-all ${isEditingSettings
+                                      ? 'bg-white border-[#0a0a0a]/30 focus-within:border-[#0a0a0a] focus-within:ring-2 focus-within:ring-[#0a0a0a]/10 shadow-2xs'
+                                      : 'bg-[#ebe6d6]/40 border-transparent cursor-not-allowed opacity-80'
+                                      }`}>
+                                      <span className="material-symbols-outlined text-[#6a6a6a] text-base shrink-0">history_toggle_off</span>
+                                      <input
+                                        type="time"
+                                        disabled={!isEditingSettings}
+                                        value={round.endTime || '18:00'}
+                                        onChange={(e) => handleUpdateSchedule(round.id, 'endTime', e.target.value)}
+                                        className={`w-full text-xs font-black text-[#0a0a0a] bg-transparent focus:outline-none ${!isEditingSettings ? 'cursor-not-allowed' : 'cursor-pointer'
+                                          }`}
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
                             </div>
+
+                            {/* Offline Execution Control Box */}
+                            {isOffline && (
+                              <div className="bg-[#feaf83]/20 border-2 border-[#feaf83] p-4 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                <div>
+                                  <h4 className="font-extrabold text-sm text-[#0a0a0a] flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined text-lg text-[#0a0a0a]">co_present</span>
+                                    <span>Kontrol Tayangan Proyektor Sesi Offline</span>
+                                  </h4>
+                                  <p className="text-xs text-[#6a6a6a] mt-0.5">
+                                    Klik tombol di samping untuk mengaktifkan sesi tayangan proyektor di ruang kelas.
+                                  </p>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleStartOfflineRound(round.id)}
+                                  className={`px-5 py-2.5 rounded-xl font-extrabold text-xs flex items-center gap-2 shadow-md transition-all shrink-0 cursor-pointer ${round.isOfflineStarted
+                                    ? 'bg-[#ff6b5a] text-white hover:bg-[#ff6b5a]/90'
+                                    : 'bg-[#0a0a0a] text-white hover:bg-[#0a0a0a]/80'
+                                    }`}
+                                >
+                                  <span className="material-symbols-outlined text-base">
+                                    {round.isOfflineStarted ? 'pause_circle' : 'play_circle'}
+                                  </span>
+                                  <span>{round.isOfflineStarted ? 'Hentikan Sesi Babak' : 'Mulai Babak'}</span>
+                                </button>
+                              </div>
+                            )}
+
+                            <div className={`grid grid-cols-1 ${isOffline ? 'sm:grid-cols-2' : 'sm:grid-cols-3'} gap-4`}>
+                              {/* Kategori Lomba */}
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-[#6a6a6a] uppercase tracking-wider">
+                                  KATEGORI LOMBA
+                                </label>
+                                <div className="relative">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (!isEditingSettings) {
+                                        setIsEditingSettings(true);
+                                      }
+                                      setOpenCategoryDropdownId(openCategoryDropdownId === round.id ? null : round.id);
+                                    }}
+                                    className="w-full flex items-center justify-between px-3 py-2 rounded-xl border border-[#0a0a0a]/20 bg-[#f5f0e0] hover:bg-[#ebe6d6] shadow-2xs cursor-pointer transition-all text-xs font-black text-[#0a0a0a]"
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <span className="material-symbols-outlined text-[18px] text-[#0a0a0a]">
+                                        {round.category === 'SD' ? 'child_care' : round.category === 'SMP' ? 'school' : 'workspace_premium'}
+                                      </span>
+                                      <span>{round.category === 'SD' ? 'SD / MI' : round.category === 'SMP' ? 'SMP / MTs' : 'SMA / SMK / MA'}</span>
+                                    </div>
+                                    <span className="material-symbols-outlined text-base text-[#0a0a0a]">
+                                      {openCategoryDropdownId === round.id ? 'expand_less' : 'expand_more'}
+                                    </span>
+                                  </button>
+
+                                  {openCategoryDropdownId === round.id && (
+                                    <>
+                                      <div
+                                        className="fixed inset-0 z-40"
+                                        onClick={() => setOpenCategoryDropdownId(null)}
+                                      />
+                                      <div className="absolute left-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-[#0a0a0a]/10 p-2 space-y-1 z-50 animate-in fade-in zoom-in-95 duration-150">
+                                        <div className="px-3 py-1.5 text-[10px] font-black uppercase text-[#6a6a6a] tracking-wider border-b border-[#0a0a0a]/5 mb-1">
+                                          Pilih Kategori Lomba
+                                        </div>
+
+                                        {/* SD Category Option */}
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            if (!isEditingSettings) setIsEditingSettings(true);
+                                            handleUpdateCategory(round.id, 'SD');
+                                            setOpenCategoryDropdownId(null);
+                                          }}
+                                          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${round.category === 'SD'
+                                            ? 'bg-[#ffb084] text-[#0a0a0a] shadow-2xs border border-[#0a0a0a]/10'
+                                            : 'hover:bg-[#f8f3e9] text-[#0a0a0a]'
+                                            }`}
+                                        >
+                                          <div className="flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-base shrink-0">child_care</span>
+                                            <div className="text-left">
+                                              <div>SD / MI</div>
+                                              <div className="text-[10px] font-medium text-[#6a6a6a]">Tingkat SD / MI Sederajat</div>
+                                            </div>
+                                          </div>
+                                          {round.category === 'SD' && (
+                                            <span className="material-symbols-outlined text-base text-[#0a0a0a] shrink-0">check_circle</span>
+                                          )}
+                                        </button>
+
+                                        {/* SMP Category Option */}
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            if (!isEditingSettings) setIsEditingSettings(true);
+                                            handleUpdateCategory(round.id, 'SMP');
+                                            setOpenCategoryDropdownId(null);
+                                          }}
+                                          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${round.category === 'SMP'
+                                            ? 'bg-[#b8a4ed] text-[#0a0a0a] shadow-2xs border border-[#0a0a0a]/10'
+                                            : 'hover:bg-[#f8f3e9] text-[#0a0a0a]'
+                                            }`}
+                                        >
+                                          <div className="flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-base shrink-0">school</span>
+                                            <div className="text-left">
+                                              <div>SMP / MTs</div>
+                                              <div className="text-[10px] font-medium text-[#6a6a6a]">Tingkat SMP / MTs Sederajat</div>
+                                            </div>
+                                          </div>
+                                          {round.category === 'SMP' && (
+                                            <span className="material-symbols-outlined text-base text-[#0a0a0a] shrink-0">check_circle</span>
+                                          )}
+                                        </button>
+
+                                        {/* SMA Category Option */}
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            if (!isEditingSettings) setIsEditingSettings(true);
+                                            handleUpdateCategory(round.id, 'SMA');
+                                            setOpenCategoryDropdownId(null);
+                                          }}
+                                          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${round.category === 'SMA'
+                                            ? 'bg-[#e8b94a] text-[#0a0a0a] shadow-2xs border border-[#0a0a0a]/10'
+                                            : 'hover:bg-[#f8f3e9] text-[#0a0a0a]'
+                                            }`}
+                                        >
+                                          <div className="flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-base shrink-0">workspace_premium</span>
+                                            <div className="text-left">
+                                              <div>SMA / SMK / MA</div>
+                                              <div className="text-[10px] font-medium text-[#6a6a6a]">Tingkat SMA / SMK / MA</div>
+                                            </div>
+                                          </div>
+                                          {round.category === 'SMA' && (
+                                            <span className="material-symbols-outlined text-base text-[#0a0a0a] shrink-0">check_circle</span>
+                                          )}
+                                        </button>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Durasi Waktu */}
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-[#6a6a6a] uppercase tracking-wider">
+                                  DURASI WAKTU
+                                </label>
+                                <div className={`flex items-center gap-2 border px-3 py-2 rounded-xl ${isEditingSettings ? 'bg-[#fffaf0] border-[#0a0a0a]/20' : 'bg-[#ebe6d6]/40 border-[#0a0a0a]/10 opacity-80'
+                                  }`}>
+                                  <span className="material-symbols-outlined text-[#6a6a6a] text-[20px]">
+                                    timer
+                                  </span>
+                                  <input
+                                    type="number"
+                                    disabled={!isEditingSettings}
+                                    value={round.durationMinutes}
+                                    onChange={(e) =>
+                                      handleUpdateDuration(round.id, parseInt(e.target.value) || 60)
+                                    }
+                                    className={`font-bold text-sm bg-transparent border-none focus:outline-none w-16 text-[#0a0a0a] ${!isEditingSettings ? 'cursor-not-allowed' : ''
+                                      }`}
+                                  />
+                                  <span className="text-xs text-[#6a6a6a] font-semibold">Menit</span>
+                                </div>
+                              </div>
+
+                              {/* Batas Pindah Tab (Hanya Muncul jika Kuis Online) */}
+                              {!isOffline && (
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-bold text-[#6a6a6a] uppercase tracking-wider">
+                                    BATAS PINDAH TAB
+                                  </label>
+                                  <div className={`flex items-center gap-2 border px-3 py-2 rounded-xl ${isEditingSettings ? 'bg-[#fffaf0] border-[#0a0a0a]/20' : 'bg-[#ebe6d6]/40 border-[#0a0a0a]/10 opacity-80'
+                                    }`}>
+                                    <span className="material-symbols-outlined text-[#6a6a6a] text-[20px]">
+                                      security
+                                    </span>
+                                    <input
+                                      type="number"
+                                      disabled={!isEditingSettings}
+                                      value={round.tabSwitchLimit}
+                                      onChange={(e) =>
+                                        handleUpdateTabLimit(round.id, parseInt(e.target.value) || 1)
+                                      }
+                                      className={`font-bold text-sm bg-transparent border-none focus:outline-none w-12 text-[#0a0a0a] ${!isEditingSettings ? 'cursor-not-allowed' : ''
+                                        }`}
+                                    />
+                                    <span className="text-xs text-[#6a6a6a] font-semibold">Kali</span>
+                                  </div>
+                                </div>
+                              )}
+                              </div>
+
+                              {/* Bottom Action Bar: Delete Round Button (Positioned at bottom right) */}
+                              <div className="flex items-center justify-end pt-3 mt-2 border-t border-[#ebe6d6]">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteRound(round.id, round.title)}
+                                  className="px-4 py-2 bg-[#ff6b5a]/10 hover:bg-[#ff6b5a]/20 text-[#d32f2f] font-extrabold text-xs rounded-xl flex items-center gap-1.5 transition-all cursor-pointer border border-[#ff6b5a]/30 shadow-2xs"
+                                >
+                                  <span className="material-symbols-outlined text-base">delete</span>
+                                  <span>Hapus Babak Ini</span>
+                                </button>
+                              </div>
                           </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                </div>
-              );
-              })}
+                  );
+                })}
             </div>
           </div>
 
@@ -916,9 +1020,8 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
         {/* Section 2: Question Importer Panel */}
         <section className="space-y-4">
           <div className="bg-[#f5f0e0] rounded-2xl overflow-hidden border border-[#0a0a0a]/10 shadow-xs">
-            <div className={`p-4 sm:p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 transition-colors ${
-              isSelectedRoundOffline ? 'bg-[#feaf83]' : 'bg-[#b8a4ed]'
-            }`}>
+            <div className={`p-4 sm:p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 transition-colors ${isSelectedRoundOffline ? 'bg-[#feaf83]' : 'bg-[#b8a4ed]'
+              }`}>
               <div className="flex items-center gap-3">
                 <div className="bg-white/20 p-2.5 rounded-xl">
                   <span className="material-symbols-outlined text-[#0a0a0a] text-[28px]">
@@ -947,14 +1050,12 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                   <button
                     type="button"
                     onClick={() => setRandomizeOrder(!randomizeOrder)}
-                    className={`w-12 h-6 rounded-full relative flex items-center px-1 transition-colors ${
-                      randomizeOrder ? 'bg-[#0a0a0a]' : 'bg-[#c4c7c7]'
-                    }`}
+                    className={`w-12 h-6 rounded-full relative flex items-center px-1 transition-colors ${randomizeOrder ? 'bg-[#0a0a0a]' : 'bg-[#c4c7c7]'
+                      }`}
                   >
                     <div
-                      className={`w-4 h-4 bg-white rounded-full transition-transform ${
-                        randomizeOrder ? 'translate-x-6' : 'translate-x-0'
-                      }`}
+                      className={`w-4 h-4 bg-white rounded-full transition-transform ${randomizeOrder ? 'translate-x-6' : 'translate-x-0'
+                        }`}
                     />
                   </button>
                 </div>
@@ -1238,9 +1339,8 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                   const isKey = newKey === opt.key;
                   return (
                     <div key={idx} className="flex items-center gap-2">
-                      <span className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 border ${
-                        isKey ? 'bg-[#a4d4c5] border-[#0a0a0a] text-[#0a0a0a]' : 'bg-[#ebe6d6] border-transparent text-[#0a0a0a]'
-                      }`}>
+                      <span className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 border ${isKey ? 'bg-[#a4d4c5] border-[#0a0a0a] text-[#0a0a0a]' : 'bg-[#ebe6d6] border-transparent text-[#0a0a0a]'
+                        }`}>
                         {opt.key}
                       </span>
                       <input
@@ -1408,9 +1508,8 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                   const isKey = editingQuestion.key === opt.key;
                   return (
                     <div key={idx} className="flex items-center gap-2">
-                      <span className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 border ${
-                        isKey ? 'bg-[#a4d4c5] border-[#0a0a0a] text-[#0a0a0a]' : 'bg-[#ebe6d6] border-transparent text-[#0a0a0a]'
-                      }`}>
+                      <span className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 border ${isKey ? 'bg-[#a4d4c5] border-[#0a0a0a] text-[#0a0a0a]' : 'bg-[#ebe6d6] border-transparent text-[#0a0a0a]'
+                        }`}>
                         {opt.key}
                       </span>
                       <input

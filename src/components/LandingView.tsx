@@ -35,16 +35,6 @@ export const LandingView: React.FC<LandingViewProps> = ({
                 <span className="italic text-[#ff6b5a] font-serif font-normal">Matematika</span>
               </h1>
 
-              {/* Theme & Tagline */}
-              <div className="bg-[#ebe6d6]/60 border-l-4 border-[#ff6b5a] p-3.5 rounded-r-2xl">
-                <div className="text-[11px] font-black uppercase text-[#ff6b5a] tracking-wider">
-                  TEMA LOMBA: {COMPETITION_INFO.theme}
-                </div>
-                <p className="text-xs sm:text-sm text-[#0a0a0a] font-semibold mt-0.5">
-                  OPTIMA Se-Pulau Jawa Tingkat SD/MI, SMP/MTs, dan SMA/SMK/MA Sederajat.
-                </p>
-              </div>
-
               {/* Subtitle */}
               <p className="text-base sm:text-lg text-[#6a6a6a] max-w-xl font-normal leading-relaxed">
                 Wadah kompetisi akademik resmi diselenggarakan oleh Himpunan Mahasiswa Matematika (HIMATIKA) UIN Siber Syekh Nurjati Cirebon untuk menumbuhkan berpikir logis, analitis, dan berintegritas.
@@ -75,9 +65,9 @@ export const LandingView: React.FC<LandingViewProps> = ({
             <div className="lg:col-span-5 relative flex justify-center items-center">
               <div className="absolute -left-6 top-1/2 -translate-y-1/2 w-32 h-32 bg-[#ffb084] rounded-full blur-0 opacity-90 z-0 hidden sm:block" />
               <div className="relative z-10 w-full max-w-md rounded-3xl overflow-hidden border-4 border-[#feaf83] shadow-2xl bg-[#fffaf0] p-2 transform hover:rotate-1 transition-transform">
-                <img 
-                  src={ASSET_IMAGES.landingBanner} 
-                  alt="OPTIMA MATRIX 2026 Banner" 
+                <img
+                  src={ASSET_IMAGES.landingBanner}
+                  alt="OPTIMA MATRIX 2026 Banner"
                   className="w-full h-auto object-cover rounded-2xl shadow-sm"
                   referrerPolicy="no-referrer"
                 />
@@ -423,7 +413,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
                 <h3 className="text-lg font-black text-[#0a0a0a] mb-2">
                   Aturan Penilaian SD & SMP
                 </h3>
-                
+
                 <ul className="space-y-2.5 text-xs text-[#0a0a0a]/80 mb-6">
                   <li className="flex items-start gap-2">
                     <span className="material-symbols-outlined text-[#ff6b5a] text-base shrink-0 mt-0.5">grade</span>
@@ -502,9 +492,8 @@ export const LandingView: React.FC<LandingViewProps> = ({
               </button>
 
               <div className="flex items-center gap-3 mb-4">
-                <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
-                  ruleModalCategory === 'sd-smp' ? 'bg-[#ff6b5a] text-white' : 'bg-[#e8b94a] text-[#0a0a0a]'
-                }`}>
+                <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${ruleModalCategory === 'sd-smp' ? 'bg-[#ff6b5a] text-white' : 'bg-[#e8b94a] text-[#0a0a0a]'
+                  }`}>
                   {ruleModalCategory === 'sd-smp' ? 'Official Rulebook SD & SMP' : 'Official Rulebook SMA'}
                 </span>
                 <span className="text-xs text-[#6a6a6a] font-bold">OPTIMA MATRIX 2026</span>

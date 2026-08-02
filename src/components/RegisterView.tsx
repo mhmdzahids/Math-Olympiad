@@ -20,7 +20,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
   }, [initialTab]);
 
   const [regType, setRegType] = useState<'individu' | 'guru'>('individu');
-  
+
   // Individu fields
   const [fullName, setFullName] = useState('Andi Pratama');
   const [email, setEmail] = useState('andi@sekolah.sch.id');
@@ -28,7 +28,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
   const [school, setSchool] = useState('SMA Negeri 1 Cirebon');
   const [category, setCategory] = useState<'SD' | 'SMP' | 'SMA'>('SMA');
   const [grade, setGrade] = useState('Kelas 10 (SMA)');
-  
+
   // Guru / Kolektif fields
   const [teacherName, setTeacherName] = useState('Bpk. Budi Santoso, S.Pd.');
   const [teacherPhone, setTeacherPhone] = useState('081234567890');
@@ -137,18 +137,15 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
         <div className="bg-white rounded-[32px] p-6 sm:p-10 clay-shadow border border-[#e7e2d8] relative z-10">
           {/* Header Banner */}
           <div className="mb-8 rounded-2xl overflow-hidden border-2 border-[#feaf83]/60 shadow-md bg-[#fffaf0]">
-            <img 
-              src={ASSET_IMAGES.competitionBanner} 
-              alt="OPTIMA MATRIX 2026 Banner" 
+            <img
+              src={ASSET_IMAGES.competitionBanner}
+              alt="OPTIMA MATRIX 2026 Banner"
               className="w-full h-auto object-cover max-h-48 sm:max-h-56"
               referrerPolicy="no-referrer"
             />
           </div>
 
           <div className="text-center mb-8">
-            <span className="bg-[#ff6b5a]/10 text-[#ff6b5a] text-[10px] font-black uppercase px-3 py-1 rounded-full tracking-wider">
-              {COMPETITION_INFO.title}
-            </span>
             <h1 className="text-3xl sm:text-4xl font-extrabold text-[#0a0a0a] tracking-tight mt-2">
               {activeTab === 'register' ? 'Pendaftaran Peserta' : 'Masuk Portal Kuis'}
             </h1>
@@ -163,22 +160,20 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
               <button
                 type="button"
                 onClick={() => setActiveTab('register')}
-                className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
-                  activeTab === 'register'
+                className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${activeTab === 'register'
                     ? 'bg-[#0a0a0a] text-white shadow-md'
                     : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
-                }`}
+                  }`}
               >
                 Formulir Pendaftaran
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab('login')}
-                className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
-                  activeTab === 'login'
+                className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${activeTab === 'login'
                     ? 'bg-[#0a0a0a] text-white shadow-md'
                     : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
-                }`}
+                  }`}
               >
                 Masuk Akun
               </button>
@@ -197,15 +192,13 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
                     <button
                       type="button"
                       onClick={() => setRegType('individu')}
-                      className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer flex items-start gap-3.5 ${
-                        regType === 'individu'
+                      className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer flex items-start gap-3.5 ${regType === 'individu'
                           ? 'bg-[#b8a4ed]/25 border-[#0a0a0a] ring-2 ring-[#0a0a0a]/10 shadow-md scale-[1.01]'
                           : 'bg-[#fffaf0] border-[#0a0a0a]/15 text-[#6a6a6a] hover:border-[#0a0a0a]/40 hover:text-[#0a0a0a]'
-                      }`}
+                        }`}
                     >
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold shrink-0 mt-0.5 ${
-                        regType === 'individu' ? 'bg-[#0a0a0a] text-white' : 'bg-[#0a0a0a]/10 text-[#0a0a0a]'
-                      }`}>
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold shrink-0 mt-0.5 ${regType === 'individu' ? 'bg-[#0a0a0a] text-white' : 'bg-[#0a0a0a]/10 text-[#0a0a0a]'
+                        }`}>
                         <span className="material-symbols-outlined text-xl">person</span>
                       </div>
                       <div>
@@ -222,15 +215,13 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
                     <button
                       type="button"
                       onClick={() => setRegType('guru')}
-                      className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer flex items-start gap-3.5 ${
-                        regType === 'guru'
+                      className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer flex items-start gap-3.5 ${regType === 'guru'
                           ? 'bg-[#a4d4c5]/35 border-[#0a0a0a] ring-2 ring-[#0a0a0a]/10 shadow-md scale-[1.01]'
                           : 'bg-[#fffaf0] border-[#0a0a0a]/15 text-[#6a6a6a] hover:border-[#0a0a0a]/40 hover:text-[#0a0a0a]'
-                      }`}
+                        }`}
                     >
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold shrink-0 mt-0.5 ${
-                        regType === 'guru' ? 'bg-[#0a0a0a] text-white' : 'bg-[#0a0a0a]/10 text-[#0a0a0a]'
-                      }`}>
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold shrink-0 mt-0.5 ${regType === 'guru' ? 'bg-[#0a0a0a] text-white' : 'bg-[#0a0a0a]/10 text-[#0a0a0a]'
+                        }`}>
                         <span className="material-symbols-outlined text-xl">groups</span>
                       </div>
                       <div>
@@ -315,33 +306,30 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
                         <button
                           type="button"
                           onClick={() => handleCategoryChange('SD')}
-                          className={`py-2.5 px-2 rounded-xl text-center border-2 transition-all cursor-pointer ${
-                            category === 'SD'
+                          className={`py-2.5 px-2 rounded-xl text-center border-2 transition-all cursor-pointer ${category === 'SD'
                               ? 'bg-[#ffb084] border-[#0a0a0a] text-[#0a0a0a] font-extrabold shadow-sm'
                               : 'bg-[#fffaf0] border-[#0a0a0a]/15 text-[#6a6a6a]'
-                          }`}
+                            }`}
                         >
                           <div className="text-xs font-bold">SD / MI</div>
                         </button>
                         <button
                           type="button"
                           onClick={() => handleCategoryChange('SMP')}
-                          className={`py-2.5 px-2 rounded-xl text-center border-2 transition-all cursor-pointer ${
-                            category === 'SMP'
+                          className={`py-2.5 px-2 rounded-xl text-center border-2 transition-all cursor-pointer ${category === 'SMP'
                               ? 'bg-[#b8a4ed] border-[#0a0a0a] text-[#0a0a0a] font-extrabold shadow-sm'
                               : 'bg-[#fffaf0] border-[#0a0a0a]/15 text-[#6a6a6a]'
-                          }`}
+                            }`}
                         >
                           <div className="text-xs font-bold">SMP / MTs</div>
                         </button>
                         <button
                           type="button"
                           onClick={() => handleCategoryChange('SMA')}
-                          className={`py-2.5 px-2 rounded-xl text-center border-2 transition-all cursor-pointer ${
-                            category === 'SMA'
+                          className={`py-2.5 px-2 rounded-xl text-center border-2 transition-all cursor-pointer ${category === 'SMA'
                               ? 'bg-[#e8b94a] border-[#0a0a0a] text-[#0a0a0a] font-extrabold shadow-sm'
                               : 'bg-[#fffaf0] border-[#0a0a0a]/15 text-[#6a6a6a]'
-                          }`}
+                            }`}
                         >
                           <div className="text-xs font-bold">SMA / SMK / MA</div>
                         </button>

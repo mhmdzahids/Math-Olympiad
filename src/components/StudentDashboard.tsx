@@ -15,15 +15,15 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   studentCategory = 'SMA',
   rounds = INITIAL_ROUNDS
 }) => {
-  const normalizedCategory = studentCategory.includes('SD') || studentCategory.includes('SMP') ? 'SD-SMP' : 'SMA';
-  const [selectedCategory, setSelectedCategory] = useState<'SD-SMP' | 'SMA'>(normalizedCategory as 'SD-SMP' | 'SMA');
+  const normalizedCategory = studentCategory.includes('SD') ? 'SD' : studentCategory.includes('SMP') ? 'SMP' : 'SMA';
+  const [selectedCategory, setSelectedCategory] = useState<'SD' | 'SMP' | 'SMA'>(normalizedCategory as 'SD' | 'SMP' | 'SMA');
 
   useEffect(() => {
-    const norm = studentCategory.includes('SD') || studentCategory.includes('SMP') ? 'SD-SMP' : 'SMA';
-    setSelectedCategory(norm as 'SD-SMP' | 'SMA');
+    const norm = studentCategory.includes('SD') ? 'SD' : studentCategory.includes('SMP') ? 'SMP' : 'SMA';
+    setSelectedCategory(norm as 'SD' | 'SMP' | 'SMA');
   }, [studentCategory]);
 
-  const displayedRounds = rounds.filter((r) => (r.category || 'SMA') === selectedCategory);
+  const displayedRounds = rounds.filter((r) => (r.category || 'SD') === selectedCategory);
 
   return (
     <div className="w-full bg-[#fef9ef] min-h-screen pb-20">
@@ -63,15 +63,30 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               <div className="flex items-center gap-1.5 bg-[#ebe6d6] p-1.5 rounded-2xl border border-[#0a0a0a]/10">
                 <button
                   type="button"
-                  onClick={() => setSelectedCategory('SD-SMP')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
-                    selectedCategory === 'SD-SMP'
-                      ? 'bg-[#ffb084] text-[#0a0a0a] shadow-2xs border border-[#0a0a0a]/20'
-                      : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
-                  }`}
+                  onClick={() => setSelectedCategory('SD')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${selectedCategory === 'SD'
+                    ? 'bg-[#ffb084] text-[#0a0a0a] shadow-2xs border border-[#0a0a0a]/20'
+                    : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
+                    }`}
                 >
-                  <span>SD - SMP</span>
-                  {normalizedCategory === 'SD-SMP' && (
+                  <span>SD / MI</span>
+                  {normalizedCategory === 'SD' && (
+                    <span className="bg-[#0a0a0a] text-white text-[9px] px-1.5 py-0.2 rounded-full font-extrabold">
+                      Anda
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategory('SMP')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${selectedCategory === 'SMP'
+                    ? 'bg-[#b8a4ed] text-[#0a0a0a] shadow-2xs border border-[#0a0a0a]/20'
+                    : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
+                    }`}
+                >
+                  <span>SMP / MTs</span>
+                  {normalizedCategory === 'SMP' && (
                     <span className="bg-[#0a0a0a] text-white text-[9px] px-1.5 py-0.2 rounded-full font-extrabold">
                       Anda
                     </span>
@@ -81,11 +96,10 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                 <button
                   type="button"
                   onClick={() => setSelectedCategory('SMA')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
-                    selectedCategory === 'SMA'
-                      ? 'bg-[#e8b94a] text-[#0a0a0a] shadow-2xs border border-[#0a0a0a]/20'
-                      : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
-                  }`}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${selectedCategory === 'SMA'
+                    ? 'bg-[#e8b94a] text-[#0a0a0a] shadow-2xs border border-[#0a0a0a]/20'
+                    : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
+                    }`}
                 >
                   <span>SMA</span>
                   {normalizedCategory === 'SMA' && (
@@ -157,55 +171,57 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                     return (
                       <div
                         key={round.id}
-                        className="clay-card bg-[#0a0a0a] text-white rounded-2xl p-6 sm:p-8 flex flex-col gap-6 relative overflow-hidden border border-[#ff6b5a]/30 shadow-2xl"
+                        className="clay-card bg-[#ffb084] text-[#0a0a0a] rounded-[28px] p-6 sm:p-8 flex flex-col gap-6 relative overflow-hidden border-2 border-[#0a0a0a] clay-shadow transition-transform hover:-translate-y-0.5"
                       >
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+
+
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
                           <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-xl bg-[#ff6b5a] text-white flex items-center justify-center font-black text-xl shrink-0">
-                              <span className="material-symbols-outlined text-2xl">quiz</span>
+                            <div className="w-12 h-12 rounded-2xl bg-[#0a0a0a] text-white flex items-center justify-center font-black text-xl shrink-0 clay-shadow-sm">
+                              <span className="material-symbols-outlined text-2xl text-[#a4d4c5]">quiz</span>
                             </div>
                             <div>
                               <div className="flex items-center gap-2 flex-wrap mb-1">
-                                <span className="bg-[#ff6b5a] text-white text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full tracking-wider">
+                                <span className="bg-[#0a0a0a] text-white text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider shadow-2xs">
                                   BABAK AKTIF
                                 </span>
                                 {isOffline ? (
-                                  <span className="bg-[#feaf83] text-[#0a0a0a] text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full">
+                                  <span className="bg-white/80 text-[#0a0a0a] text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full border border-[#0a0a0a]/20">
                                     Sesi Offline Kampus UIN
                                   </span>
                                 ) : (
-                                  <span className="bg-[#b8a4ed] text-[#0a0a0a] text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full">
+                                  <span className="bg-white/80 text-[#0a0a0a] text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full border border-[#0a0a0a]/20">
                                     Zoom Daring
                                   </span>
                                 )}
                               </div>
-                              <h3 className="text-xl sm:text-2xl font-black text-white">{round.title}</h3>
+                              <h3 className="text-xl sm:text-2xl font-black text-[#0a0a0a] tracking-tight">{round.title}</h3>
                             </div>
                           </div>
 
-                          <div className="text-xs text-white/80 font-bold bg-white/10 px-3 py-1.5 rounded-xl shrink-0 self-start sm:self-auto">
+                          <div className="text-xs text-[#0a0a0a] font-extrabold bg-white/80 border border-[#0a0a0a]/20 px-3.5 py-1.5 rounded-xl shrink-0 self-start sm:self-auto shadow-2xs">
                             {round.questionCount} Soal • {round.durationMinutes} Menit
                           </div>
                         </div>
 
-                        <p className="text-sm text-white/80 leading-relaxed">
+                        <p className="text-sm text-[#0a0a0a]/90 font-medium leading-relaxed max-w-2xl relative z-10">
                           {isOffline
                             ? 'Sesi final dilaksanakan tatap muka di Kampus UIN Siber Syekh Nurjati Cirebon.'
                             : 'Ujian penyisihan daring via Zoom. Kamera pengawas wajib diatur posisi samping ±1 meter.'}
                         </p>
 
-                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pt-2 border-t border-white/10">
-                          <div className="text-xs text-white/70">
-                            Waktu Pelaksanaan: <strong className="text-white">{round.startDate || '14 Sept 2026'} ({round.startTime || '13.00'} WIB)</strong>
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pt-4 border-t-2 border-[#0a0a0a]/15 relative z-10">
+                          <div className="text-xs text-[#0a0a0a]/80 font-bold">
+                            Waktu Pelaksanaan: <strong className="text-[#0a0a0a] font-black">{round.startDate || '14 Sept 2026'} ({round.startTime || '13.00'} WIB)</strong>
                           </div>
 
                           {!isOffline && (
                             <button
                               onClick={() => onNavigate('quiz')}
-                              className="w-full sm:w-auto bg-[#ff6b5a] hover:bg-[#ff6b5a]/90 text-white font-extrabold px-6 py-3 rounded-xl shadow-lg transition-all text-sm flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                              className="w-full sm:w-auto bg-[#0a0a0a] hover:bg-[#1a1a1a] text-white font-extrabold px-7 py-3.5 rounded-2xl clay-shadow clay-button-active transition-all text-sm flex items-center justify-center gap-2 cursor-pointer"
                             >
                               <span>Mulai Kuis Sekarang</span>
-                              <span className="material-symbols-outlined text-sm">play_arrow</span>
+                              <span className="material-symbols-outlined text-sm text-[#a4d4c5]">play_arrow</span>
                             </button>
                           )}
                         </div>
@@ -256,20 +272,26 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
           {/* Right Sidebar */}
           <div className="lg:col-span-4 space-y-6">
-            {/* Contact Persons Card from Proposal */}
-            <div className="bg-[#fffaf0] rounded-2xl p-6 border-2 border-[#0a0a0a]/15 shadow-sm space-y-4">
-              <div className="flex items-center gap-2 text-xs font-black uppercase text-[#ff6b5a] tracking-wider">
-                <span className="material-symbols-outlined text-base">support_agent</span>
-                <span>Narahubung Resmi OPTIMA</span>
-              </div>
-              <div className="space-y-3 text-xs">
-                {COMPETITION_INFO.contacts.map((c) => (
-                  <div key={c.category} className="bg-white p-3 rounded-xl border border-[#0a0a0a]/10">
-                    <div className="font-bold text-[#0a0a0a]">{c.category}</div>
-                    <div className="text-[#6a6a6a]">{c.name}</div>
-                    <div className="font-mono font-bold text-[#ff6b5a] mt-0.5">{c.phone}</div>
-                  </div>
-                ))}
+            {/* Qualification Status Card */}
+            <div className="bg-[#ffdbca] rounded-2xl p-6 shadow-lg relative overflow-hidden group">
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="material-symbols-outlined text-[#8b4f2b]">campaign</span>
+                  <h2 className="font-bold text-base text-[#6e3816]">Status Kualifikasi</h2>
+                </div>
+
+                <div className="bg-white/50 backdrop-blur-sm rounded-xl p-4 border border-white/40 mb-4">
+                  <p className="text-sm text-[#6e3816]">
+                    Pengumuman resmi: <br />
+                    <strong className="text-[#0a0a0a] font-black text-base">
+                      "Anda lolos ke Penyisihan 2!"
+                    </strong>
+                  </p>
+                </div>
+
+                <p className="text-xs text-[#6e3816]/90 leading-relaxed">
+                  Hasil Anda di babak sebelumnya menempatkan Anda di 15% peserta teratas. Pertahankan prestasi ini!
+                </p>
               </div>
             </div>
 
