@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ScreenView, CompetitionRound } from './types';
 import { INITIAL_ROUNDS } from './data/mockData';
 import { TopNavbar } from './components/TopNavbar';
@@ -9,24 +9,97 @@ import { QuizExecutionView } from './components/QuizExecutionView';
 import { AdminRoundManagerView } from './components/AdminRoundManagerView';
 import { AdminLeaderboardView } from './components/AdminLeaderboardView';
 import { Footer } from './components/Footer';
+import { apiService, UserOut } from './services/api';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<ScreenView>('landing');
-  const [isLoggedIn, setIsLoggedIn] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentUser, setCurrentUser] = useState<UserOut | null>(null);
   const [authInitialTab, setAuthInitialTab] = useState<'register' | 'login'>('register');
-  const [selectedRound, setSelectedRound] = useState<string>('Penyisihan 2 - SMA');
+  const initialSdRound = INITIAL_ROUNDS.find((r) => r.category === 'SD') || INITIAL_ROUNDS[0];
+  const [selectedRound, setSelectedRound] = useState<string>(initialSdRound ? initialSdRound.title : 'Babak Penyisihan 1 (SD)');
   const [rounds, setRounds] = useState<CompetitionRound[]>(INITIAL_ROUNDS);
-  const [registeredUser, setRegisteredUser] = useState<any>({
-    fullName: 'Andi Pratama',
-    category: 'SMA'
-  });
+  const [activeQuizRound, setActiveQuizRound] = useState<CompetitionRound | null>(null);
   const [isAdminEditingRounds, setIsAdminEditingRounds] = useState<boolean>(false);
   const [highlightSaveTrigger, setHighlightSaveTrigger] = useState<number>(0);
   const [authModal, setAuthModal] = useState<'login' | 'register' | null>(null);
   const [authEmail, setAuthEmail] = useState('');
   const [authPass, setAuthPass] = useState('');
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const [pendingNav, setPendingNav] = useState<{ screen: ScreenView; tab?: 'register' | 'login' } | null>(null);
+
+  useEffect(() => {
+    async function checkSession() {
+      const token = apiService.getToken();
+      if (token) {
+        try {
+          const user = await apiService.getMe();
+          setCurrentUser(user);
+          setIsLoggedIn(true);
+          if (user.role === 'admin') {
+            setCurrentScreen('admin-leaderboard');
+          } else {
+            setCurrentScreen('student-dashboard');
+          }
+        } catch {
+          apiService.logout();
+          setIsLoggedIn(false);
+          setCurrentUser(null);
+        }
+      }
+    }
+
+    async function loadRoundsFromDb() {
+      try {
+        const dbRounds = await apiService.getRounds();
+        if (dbRounds && dbRounds.length > 0) {
+          const mapped: CompetitionRound[] = dbRounds.map((r) => ({
+            id: r.id,
+            title: r.name,
+            category: r.category.toUpperCase() as 'SD' | 'SMP' | 'SMA',
+            questionCount: r.question_count ?? (r.category === 'sma' ? 30 : 25),
+            durationMinutes: r.duration_minutes,
+            tabSwitchLimit: r.tab_switch_limit,
+            status: r.status === 'draft' ? 'upcoming' : r.status === 'aktif' ? 'active' : 'completed',
+            executionMode: r.mode,
+            isOfflineStarted: r.is_offline_started,
+            startDate: r.start_date,
+            startTime: r.start_time,
+            endDate: r.end_date,
+            endTime: r.end_time,
+          }));
+          setRounds(mapped);
+          const topSd = mapped.find((r) => r.category === 'SD') || mapped[0];
+          if (topSd) {
+            setSelectedRound(topSd.title);
+          }
+        }
+      } catch (err) {
+        console.warn('Fallback to local rounds:', err);
+      }
+    }
+
+    checkSession();
+    loadRoundsFromDb();
+  }, []);
+
+  const handleLoginSuccess = (user: UserOut) => {
+    setCurrentUser(user);
+    setIsLoggedIn(true);
+    if (user.role === 'admin') {
+      setCurrentScreen('admin-leaderboard');
+    } else {
+      setCurrentScreen('student-dashboard');
+    }
+  };
+
+  const handleLogout = () => {
+    apiService.logout();
+    setIsLoggedIn(false);
+    setCurrentUser(null);
+    setCurrentScreen('landing');
+  };
 
   const handleNavigate = (screen: ScreenView, tab?: 'register' | 'login') => {
     if (isAdminEditingRounds && screen !== currentScreen) {
@@ -57,17 +130,28 @@ export default function App() {
     setHighlightSaveTrigger((prev) => prev + 1);
   };
 
-  const handleAuthSubmit = (e: React.FormEvent) => {
+  const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (authModal === 'register') {
-      setRegisteredUser({
-        fullName: authEmail.split('@')[0] || 'Andi Pratama',
-        category: 'SMA'
-      });
+    setAuthError(null);
+    try {
+      if (authModal === 'login') {
+        await apiService.login(authEmail, authPass);
+      } else {
+        await apiService.register({
+          email: authEmail,
+          password: authPass,
+          full_name: authEmail.split('@')[0] || 'Peserta Baru',
+          school_name: 'Sekolah Participant',
+          category: 'sma',
+        });
+        await apiService.login(authEmail, authPass);
+      }
+      const user = await apiService.getMe();
+      handleLoginSuccess(user);
+      setAuthModal(null);
+    } catch (err: any) {
+      setAuthError(err.message || 'Proses otentikasi gagal.');
     }
-    setIsLoggedIn(true);
-    setAuthModal(null);
-    setCurrentScreen('student-dashboard');
   };
 
   return (
@@ -150,14 +234,26 @@ export default function App() {
         onSelectRound={(r) => setSelectedRound(r)}
         rounds={rounds}
         isLoggedIn={isLoggedIn}
-        userName={registeredUser?.fullName || 'Andi Pratama'}
-        userCategory={registeredUser?.category ? `${registeredUser.category} Category` : 'SMA Category'}
-        onLogout={() => setIsLoggedIn(false)}
+        userName={
+          currentUser?.role === 'admin'
+            ? 'Admin Officer'
+            : currentUser?.participant?.full_name || currentUser?.email || 'Peserta'
+        }
+        userCategory={
+          currentUser?.role === 'admin'
+            ? 'Administrator'
+            : currentUser?.participant?.category === 'sd'
+            ? 'SD Category'
+            : currentUser?.participant?.category === 'smp'
+            ? 'SMP Category'
+            : 'SMA Category'
+        }
+        onLogout={handleLogout}
         variant={
-          currentScreen === 'student-dashboard'
-            ? 'student'
-            : currentScreen.startsWith('admin')
+          currentUser?.role === 'admin' || currentScreen.startsWith('admin')
             ? 'admin'
+            : isLoggedIn || currentScreen === 'student-dashboard'
+            ? 'student'
             : 'default'
         }
         onOpenAuthModal={(type) => {
@@ -171,10 +267,6 @@ export default function App() {
           <LandingView
             onNavigate={handleNavigate}
             isLoggedIn={isLoggedIn}
-            onRegisterSuccess={(data) => {
-              setRegisteredUser(data);
-              setIsLoggedIn(true);
-            }}
           />
         )}
 
@@ -182,24 +274,41 @@ export default function App() {
           <RegisterView
             onNavigate={handleNavigate}
             initialTab={authInitialTab}
-            onRegisterSuccess={(data) => {
-              setRegisteredUser(data);
-              setIsLoggedIn(true);
-            }}
+            onLoginSuccess={handleLoginSuccess}
           />
         )}
 
         {currentScreen === 'student-dashboard' && (
           <StudentDashboard
             onNavigate={handleNavigate}
-            studentName={registeredUser?.fullName || 'Andi'}
-            studentCategory={registeredUser?.category || 'SMA'}
+            studentName={currentUser?.participant?.full_name || currentUser?.email || 'Peserta'}
+            studentCategory={
+              currentUser?.participant?.category === 'sd'
+                ? 'SD'
+                : currentUser?.participant?.category === 'smp'
+                ? 'SMP'
+                : 'SMA'
+            }
             rounds={rounds}
+            onStartQuiz={(round) => {
+              setActiveQuizRound(round);
+              handleNavigate('quiz');
+            }}
           />
         )}
 
         {currentScreen === 'quiz' && (
-          <QuizExecutionView onNavigate={handleNavigate} />
+          <QuizExecutionView
+            onNavigate={handleNavigate}
+            activeRound={activeQuizRound}
+            studentCategory={
+              currentUser?.participant?.category === 'sd'
+                ? 'SD'
+                : currentUser?.participant?.category === 'smp'
+                ? 'SMP'
+                : 'SMA'
+            }
+          />
         )}
 
         {currentScreen === 'admin-rounds' && (
@@ -209,6 +318,8 @@ export default function App() {
             onUpdateRounds={setRounds}
             onEditModeChange={setIsAdminEditingRounds}
             highlightSaveTrigger={highlightSaveTrigger}
+            selectedRoundTitle={selectedRound}
+            onSelectRound={setSelectedRound}
           />
         )}
 

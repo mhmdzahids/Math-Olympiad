@@ -118,13 +118,21 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
             />
           </button>
 
-          {variant === 'admin' && (
-            <>
-              <div className="h-6 w-[1px] bg-[#c4c7c7] hidden sm:block" />
-              <div className="relative">
+          {/* Smooth Sliding Dropdown Container */}
+          <div
+            className={`flex items-center transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${
+              currentScreen === 'admin-rounds'
+                ? 'max-w-[320px] opacity-100 scale-100 pointer-events-auto overflow-visible'
+                : 'max-w-0 opacity-0 scale-95 pointer-events-none overflow-hidden'
+            }`}
+          >
+            <div className="flex items-center py-1">
+              <div className="h-6 w-[1px] bg-[#c4c7c7] hidden sm:block mr-3 sm:mr-6 shrink-0" />
+              <div className="relative shrink-0 whitespace-nowrap">
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setRoundDropdownOpen(!roundDropdownOpen);
                     setProfileDropdownOpen(false);
                     setActiveCategoryHover(null);
@@ -136,7 +144,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
                   <span className="material-symbols-outlined text-[18px]">expand_more</span>
                 </button>
 
-                {roundDropdownOpen && (
+                {roundDropdownOpen && currentScreen === 'admin-rounds' && (
                   <div className="absolute left-0 mt-2 flex flex-col sm:flex-row items-start gap-1 z-50 animate-in fade-in zoom-in-95 duration-150">
                     {/* Main Categories Menu */}
                     <div className="w-56 bg-white rounded-2xl shadow-2xl border border-[#0a0a0a]/10 p-2 space-y-1 self-start h-fit">
@@ -243,8 +251,8 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
                   </div>
                 )}
               </div>
-            </>
-          )}
+            </div>
+          </div>
         </div>
 
         {/* Center Section: Navigation Links */}
@@ -274,6 +282,21 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
             </>
           ) : (
             <>
+              {currentScreen === 'student-dashboard' && (
+                <button
+                  onClick={() => {
+                    setActiveSection(null);
+                    onNavigate('student-dashboard');
+                  }}
+                  className={`font-semibold text-sm transition-all pb-0.5 cursor-pointer ${
+                    currentScreen === 'student-dashboard' && activeSection === null
+                      ? 'text-[#0a0a0a] border-b-2 border-[#0a0a0a]'
+                      : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
+                  }`}
+                >
+                  Dashboard
+                </button>
+              )}
               <button
                 onClick={() => {
                   setActiveSection('schedule');
@@ -288,7 +311,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
                     }, 100);
                   }
                 }}
-                className={`font-semibold text-sm transition-all pb-0.5 ${
+                className={`font-semibold text-sm transition-all pb-0.5 cursor-pointer ${
                   currentScreen === 'landing' && activeSection === 'schedule'
                     ? 'text-[#0a0a0a] border-b-2 border-[#0a0a0a]'
                     : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
@@ -407,6 +430,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
                   <button
                     onClick={() => {
                       setProfileDropdownOpen(false);
+                      if (onLogout) onLogout();
                       onNavigate('landing');
                     }}
                     className="w-full text-left px-4 py-2 text-xs font-bold text-[#ff6b5a] hover:bg-[#ff6b5a]/10 flex items-center gap-2 transition-colors"

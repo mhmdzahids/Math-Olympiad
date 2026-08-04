@@ -1,27 +1,65 @@
 import React, { useState, useEffect } from 'react';
 import { ScreenView, CompetitionRound } from '../types';
 import { ASSET_IMAGES, INITIAL_ROUNDS, COMPETITION_INFO } from '../data/mockData';
+import { apiService } from '../services/api';
 
 interface StudentDashboardProps {
   onNavigate: (screen: ScreenView) => void;
   studentName?: string;
   studentCategory?: string;
   rounds?: CompetitionRound[];
+  onStartQuiz?: (round: CompetitionRound) => void;
 }
 
 export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   onNavigate,
   studentName = 'Andi',
   studentCategory = 'SMA',
-  rounds = INITIAL_ROUNDS
+  rounds = INITIAL_ROUNDS,
+  onStartQuiz
 }) => {
   const normalizedCategory = studentCategory.includes('SD') ? 'SD' : studentCategory.includes('SMP') ? 'SMP' : 'SMA';
   const [selectedCategory, setSelectedCategory] = useState<'SD' | 'SMP' | 'SMA'>(normalizedCategory as 'SD' | 'SMP' | 'SMA');
+  const [myQuizSessionsList, setMyQuizSessionsList] = useState<any[]>([]);
 
   useEffect(() => {
     const norm = studentCategory.includes('SD') ? 'SD' : studentCategory.includes('SMP') ? 'SMP' : 'SMA';
     setSelectedCategory(norm as 'SD' | 'SMP' | 'SMA');
   }, [studentCategory]);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadMySessions() {
+      try {
+        const list = await apiService.getMyQuizSessions();
+        if (!isMounted) return;
+        setMyQuizSessionsList(list || []);
+      } catch {
+        // Fallback if unauthenticated / offline
+      }
+    }
+    loadMySessions();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  function getRoundScheduleInfo(round: CompetitionRound) {
+    const sDate = round.startDate || '2026-08-01';
+    const sTime = round.startTime || '08:00';
+    const eDate = round.endDate || '2026-08-10';
+    const eTime = round.endTime || '18:00';
+
+    const startDt = new Date(`${sDate}T${sTime}:00`);
+    const endDt = new Date(`${eDate}T${eTime}:00`);
+    const now = new Date();
+
+    const isBefore = now < startDt;
+    const isAfter = now > endDt;
+    const isOpen = !isBefore && !isAfter;
+
+    return { isBefore, isAfter, isOpen, sDate, sTime, eDate, eTime };
+  }
 
   const displayedRounds = rounds.filter((r) => (r.category || 'SD') === selectedCategory);
 
@@ -58,57 +96,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               <h2 className="text-xl sm:text-2xl font-extrabold text-[#0a0a0a] tracking-tight">
                 Babak Kompetisi OPTIMA 2026
               </h2>
-
-              {/* Category Filter Tabs */}
-              <div className="flex items-center gap-1.5 bg-[#ebe6d6] p-1.5 rounded-2xl border border-[#0a0a0a]/10">
-                <button
-                  type="button"
-                  onClick={() => setSelectedCategory('SD')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${selectedCategory === 'SD'
-                    ? 'bg-[#ffb084] text-[#0a0a0a] shadow-2xs border border-[#0a0a0a]/20'
-                    : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
-                    }`}
-                >
-                  <span>SD / MI</span>
-                  {normalizedCategory === 'SD' && (
-                    <span className="bg-[#0a0a0a] text-white text-[9px] px-1.5 py-0.2 rounded-full font-extrabold">
-                      Anda
-                    </span>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedCategory('SMP')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${selectedCategory === 'SMP'
-                    ? 'bg-[#b8a4ed] text-[#0a0a0a] shadow-2xs border border-[#0a0a0a]/20'
-                    : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
-                    }`}
-                >
-                  <span>SMP / MTs</span>
-                  {normalizedCategory === 'SMP' && (
-                    <span className="bg-[#0a0a0a] text-white text-[9px] px-1.5 py-0.2 rounded-full font-extrabold">
-                      Anda
-                    </span>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedCategory('SMA')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${selectedCategory === 'SMA'
-                    ? 'bg-[#e8b94a] text-[#0a0a0a] shadow-2xs border border-[#0a0a0a]/20'
-                    : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
-                    }`}
-                >
-                  <span>SMA</span>
-                  {normalizedCategory === 'SMA' && (
-                    <span className="bg-[#0a0a0a] text-white text-[9px] px-1.5 py-0.2 rounded-full font-extrabold">
-                      Anda
-                    </span>
-                  )}
-                </button>
-              </div>
             </div>
 
             <div className="space-y-6">
@@ -121,8 +108,23 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               ) : (
                 displayedRounds.map((round, idx) => {
                   const isOffline = round.executionMode === 'offline';
+                  const session = myQuizSessionsList.find((s) => s.round_id === round.id);
+                  const { isBefore, isAfter, isOpen, sDate, sTime, eDate, eTime } = getRoundScheduleInfo(round);
 
-                  if (round.status === 'submitted') {
+                  const isCompletedSession = Boolean(
+                    session && (
+                      session.status === 'completed' ||
+                      session.status === 'force_ended_tabswitch' ||
+                      session.status === 'force_ended_timeout' ||
+                      session.submitted_at
+                    )
+                  );
+
+                  const isOngoingSession = Boolean(
+                    session && session.status === 'in_progress' && session.remaining_seconds > 0
+                  );
+
+                  if (round.status === 'submitted' || isCompletedSession) {
                     return (
                       <div
                         key={round.id}
@@ -146,8 +148,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                         <div className="flex-grow">
                           <div className="flex items-center gap-2 mb-1 flex-wrap">
                             <h3 className="text-lg font-bold text-[#0a0a0a]">{round.title}</h3>
-                            <span className="bg-[#ebe6d6] text-[#6a6a6a] px-2.5 py-0.5 rounded-lg text-[11px] font-bold uppercase">
-                              Selesai
+                            <span className="bg-[#a4d4c5] text-[#0a0a0a] px-2.5 py-0.5 rounded-lg text-[11px] font-black uppercase">
+                              Selesai (1x Percobaan)
                             </span>
                             {isOffline && (
                               <span className="bg-[#feaf83]/30 text-[#0a0a0a] px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase">
@@ -156,12 +158,19 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                             )}
                           </div>
                           <p className="text-sm text-[#6a6a6a]">
-                            Jawaban Anda telah tersimpan. Pengumuman kualifikasi babak final diumumkan oleh panitia.
+                            Jawaban Anda telah tersimpan dan dinilai oleh server. Setiap peserta hanya berhak 1x kesempatan pengerjaan.
                           </p>
                         </div>
 
                         <div className="text-left md:text-right shrink-0">
-                          <span className="text-sm font-semibold text-[#6a6a6a]">Proses Penilaian</span>
+                          <button
+                            type="button"
+                            disabled
+                            className="bg-[#0a0a0a]/10 text-[#6a6a6a] font-extrabold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 cursor-not-allowed border border-[#0a0a0a]/10"
+                          >
+                            <span className="material-symbols-outlined text-sm text-[#0a0a0a]/60">check_circle</span>
+                            <span>Quiz Sudah Selesai Dikerjakan</span>
+                          </button>
                         </div>
                       </div>
                     );
@@ -173,8 +182,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                         key={round.id}
                         className="clay-card bg-[#ffb084] text-[#0a0a0a] rounded-[28px] p-6 sm:p-8 flex flex-col gap-6 relative overflow-hidden border-2 border-[#0a0a0a] clay-shadow transition-transform hover:-translate-y-0.5"
                       >
-
-
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
                           <div className="flex items-center gap-3">
                             <div className="w-12 h-12 rounded-2xl bg-[#0a0a0a] text-white flex items-center justify-center font-black text-xl shrink-0 clay-shadow-sm">
@@ -185,6 +192,11 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                                 <span className="bg-[#0a0a0a] text-white text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider shadow-2xs">
                                   BABAK AKTIF
                                 </span>
+                                {isOngoingSession && (
+                                  <span className="bg-[#ba1a1a] text-white text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider animate-pulse shadow-2xs">
+                                    SESI BERJALAN
+                                  </span>
+                                )}
                                 {isOffline ? (
                                   <span className="bg-white/80 text-[#0a0a0a] text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full border border-[#0a0a0a]/20">
                                     Sesi Offline Kampus UIN
@@ -212,17 +224,67 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
                         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pt-4 border-t-2 border-[#0a0a0a]/15 relative z-10">
                           <div className="text-xs text-[#0a0a0a]/80 font-bold">
-                            Waktu Pelaksanaan: <strong className="text-[#0a0a0a] font-black">{round.startDate || '14 Sept 2026'} ({round.startTime || '13.00'} WIB)</strong>
+                            Jadwal Ujian: <strong className="text-[#0a0a0a] font-black">{sDate} ({sTime} WIB) s.d {eDate} ({eTime} WIB)</strong>
                           </div>
 
                           {!isOffline && (
-                            <button
-                              onClick={() => onNavigate('quiz')}
-                              className="w-full sm:w-auto bg-[#0a0a0a] hover:bg-[#1a1a1a] text-white font-extrabold px-7 py-3.5 rounded-2xl clay-shadow clay-button-active transition-all text-sm flex items-center justify-center gap-2 cursor-pointer"
-                            >
-                              <span>Mulai Kuis Sekarang</span>
-                              <span className="material-symbols-outlined text-sm text-[#a4d4c5]">play_arrow</span>
-                            </button>
+                            <>
+                              {isCompletedSession ? (
+                                <button
+                                  type="button"
+                                  disabled
+                                  className="w-full sm:w-auto bg-[#0a0a0a]/30 text-white/70 font-extrabold px-6 py-3.5 rounded-2xl text-xs sm:text-sm flex items-center justify-center gap-2 cursor-not-allowed border border-[#0a0a0a]/20"
+                                  title="Quiz sudah selesai dikerjakan"
+                                >
+                                  <span className="material-symbols-outlined text-sm text-[#a4d4c5]">check_circle</span>
+                                  <span>Quiz Sudah Selesai Dikerjakan</span>
+                                </button>
+                              ) : isOngoingSession ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (onStartQuiz) onStartQuiz(round);
+                                    else onNavigate('quiz');
+                                  }}
+                                  className="w-full sm:w-auto bg-[#0a0a0a] hover:bg-[#1a1a1a] text-[#a4d4c5] font-extrabold px-7 py-3.5 rounded-2xl clay-shadow clay-button-active transition-all text-sm flex items-center justify-center gap-2 cursor-pointer animate-pulse"
+                                >
+                                  <span>Lanjutkan Quiz</span>
+                                  <span className="material-symbols-outlined text-sm text-[#a4d4c5]">forward</span>
+                                </button>
+                              ) : isOpen ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (onStartQuiz) onStartQuiz(round);
+                                    else onNavigate('quiz');
+                                  }}
+                                  className="w-full sm:w-auto bg-[#0a0a0a] hover:bg-[#1a1a1a] text-white font-extrabold px-7 py-3.5 rounded-2xl clay-shadow clay-button-active transition-all text-sm flex items-center justify-center gap-2 cursor-pointer"
+                                >
+                                  <span>Mulai Quiz Sekarang</span>
+                                  <span className="material-symbols-outlined text-sm text-[#a4d4c5]">play_arrow</span>
+                                </button>
+                              ) : isBefore ? (
+                                <button
+                                  type="button"
+                                  disabled
+                                  className="w-full sm:w-auto bg-[#0a0a0a]/40 text-white/70 font-extrabold px-6 py-3.5 rounded-2xl text-xs sm:text-sm flex items-center justify-center gap-2 cursor-not-allowed border border-[#0a0a0a]/20"
+                                  title="Waktu ujian belum dimulai"
+                                >
+                                  <span className="material-symbols-outlined text-sm">lock_clock</span>
+                                  <span>Waktu Ujian Belum Dimulai</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  disabled
+                                  className="w-full sm:w-auto bg-[#0a0a0a]/40 text-white/70 font-extrabold px-6 py-3.5 rounded-2xl text-xs sm:text-sm flex items-center justify-center gap-2 cursor-not-allowed border border-[#0a0a0a]/20"
+                                  title="Waktu ujian telah berakhir"
+                                >
+                                  <span className="material-symbols-outlined text-sm">event_busy</span>
+                                  <span>Waktu Ujian Berakhir</span>
+                                </button>
+                              )}
+                            </>
                           )}
                         </div>
                       </div>

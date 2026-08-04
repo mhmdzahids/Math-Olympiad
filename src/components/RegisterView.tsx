@@ -1,19 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { ScreenView } from '../types';
 import { ASSET_IMAGES, COMPETITION_INFO } from '../data/mockData';
+import { apiService, UserOut } from '../services/api';
 
 interface RegisterViewProps {
   onNavigate: (screen: ScreenView) => void;
   onRegisterSuccess?: (userData: any) => void;
+  onLoginSuccess?: (user: UserOut) => void;
   initialTab?: 'register' | 'login';
 }
 
 export const RegisterView: React.FC<RegisterViewProps> = ({
   onNavigate,
   onRegisterSuccess,
+  onLoginSuccess,
   initialTab = 'register'
 }) => {
   const [activeTab, setActiveTab] = useState<'register' | 'login'>(initialTab);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     setActiveTab(initialTab);
@@ -83,42 +87,54 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
     );
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const executeLogin = async (loginEmail: string, loginPass: string) => {
+    setErrorMessage(null);
     setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
-      if (onRegisterSuccess) {
-        if (activeTab === 'login') {
-          onRegisterSuccess({
-            fullName: email.split('@')[0] || 'Andi Pratama',
-            email,
-            school,
-            grade,
-            category: category === 'SMA' ? 'SMA' : 'SD-SMP'
-          });
-        } else if (regType === 'individu') {
-          onRegisterSuccess({
-            fullName,
-            email,
-            school,
-            grade,
-            category: category === 'SMA' ? 'SMA' : 'SD-SMP',
-            regType: 'individu'
-          });
-        } else {
-          onRegisterSuccess({
-            fullName: teacherName || 'Bpk/Ibu Guru',
-            email,
-            school,
-            regType: 'guru',
-            studentsCount: studentsList.length,
-            students: studentsList
-          });
-        }
+    try {
+      await apiService.login(loginEmail, loginPass);
+      const user = await apiService.getMe();
+      if (onLoginSuccess) {
+        onLoginSuccess(user);
       }
-      onNavigate('student-dashboard');
-    }, 500);
+      if (user.role === 'admin') {
+        onNavigate('admin-leaderboard');
+      } else {
+        onNavigate('student-dashboard');
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Login gagal. Periksa kembali email dan password Anda.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+
+    if (activeTab === 'login') {
+      await executeLogin(email, password);
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const regCategory = category === 'SD' ? 'sd' : category === 'SMP' ? 'smp' : 'sma';
+      await apiService.register({
+        email,
+        password,
+        full_name: fullName,
+        school_name: school,
+        category: regCategory,
+        grade,
+      });
+
+      // Auto login after successful registration
+      await executeLogin(email, password);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Registrasi gagal. Periksa kembali data Anda.');
+      setIsSubmitting(false);
+    }
   };
 
   const getFeeInfo = (cat: 'SD' | 'SMP' | 'SMA') => {
@@ -161,8 +177,8 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
                 type="button"
                 onClick={() => setActiveTab('register')}
                 className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${activeTab === 'register'
-                    ? 'bg-[#0a0a0a] text-white shadow-md'
-                    : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
+                  ? 'bg-[#0a0a0a] text-white shadow-md'
+                  : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
                   }`}
               >
                 Formulir Pendaftaran
@@ -171,8 +187,8 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
                 type="button"
                 onClick={() => setActiveTab('login')}
                 className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${activeTab === 'login'
-                    ? 'bg-[#0a0a0a] text-white shadow-md'
-                    : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
+                  ? 'bg-[#0a0a0a] text-white shadow-md'
+                  : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
                   }`}
               >
                 Masuk Akun
@@ -193,8 +209,8 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
                       type="button"
                       onClick={() => setRegType('individu')}
                       className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer flex items-start gap-3.5 ${regType === 'individu'
-                          ? 'bg-[#b8a4ed]/25 border-[#0a0a0a] ring-2 ring-[#0a0a0a]/10 shadow-md scale-[1.01]'
-                          : 'bg-[#fffaf0] border-[#0a0a0a]/15 text-[#6a6a6a] hover:border-[#0a0a0a]/40 hover:text-[#0a0a0a]'
+                        ? 'bg-[#b8a4ed]/25 border-[#0a0a0a] ring-2 ring-[#0a0a0a]/10 shadow-md scale-[1.01]'
+                        : 'bg-[#fffaf0] border-[#0a0a0a]/15 text-[#6a6a6a] hover:border-[#0a0a0a]/40 hover:text-[#0a0a0a]'
                         }`}
                     >
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold shrink-0 mt-0.5 ${regType === 'individu' ? 'bg-[#0a0a0a] text-white' : 'bg-[#0a0a0a]/10 text-[#0a0a0a]'
@@ -216,8 +232,8 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
                       type="button"
                       onClick={() => setRegType('guru')}
                       className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer flex items-start gap-3.5 ${regType === 'guru'
-                          ? 'bg-[#a4d4c5]/35 border-[#0a0a0a] ring-2 ring-[#0a0a0a]/10 shadow-md scale-[1.01]'
-                          : 'bg-[#fffaf0] border-[#0a0a0a]/15 text-[#6a6a6a] hover:border-[#0a0a0a]/40 hover:text-[#0a0a0a]'
+                        ? 'bg-[#a4d4c5]/35 border-[#0a0a0a] ring-2 ring-[#0a0a0a]/10 shadow-md scale-[1.01]'
+                        : 'bg-[#fffaf0] border-[#0a0a0a]/15 text-[#6a6a6a] hover:border-[#0a0a0a]/40 hover:text-[#0a0a0a]'
                         }`}
                     >
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold shrink-0 mt-0.5 ${regType === 'guru' ? 'bg-[#0a0a0a] text-white' : 'bg-[#0a0a0a]/10 text-[#0a0a0a]'
@@ -247,7 +263,6 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
                         <input
                           type="text"
                           required
-                          value={fullName}
                           onChange={(e) => setFullName(e.target.value)}
                           placeholder="cth. Andi Pratama"
                           className="w-full bg-[#fffaf0] border-2 border-[#0a0a0a]/15 rounded-xl px-4 py-3 text-sm font-semibold text-[#0a0a0a] focus:outline-none focus:border-[#0a0a0a]"
@@ -261,7 +276,6 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
                         <input
                           type="email"
                           required
-                          value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           placeholder="andi@sekolah.sch.id"
                           className="w-full bg-[#fffaf0] border-2 border-[#0a0a0a]/15 rounded-xl px-4 py-3 text-sm font-semibold text-[#0a0a0a] focus:outline-none focus:border-[#0a0a0a]"
@@ -275,7 +289,6 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
                         <input
                           type="password"
                           required
-                          value={password}
                           onChange={(e) => setPassword(e.target.value)}
                           placeholder="••••••••"
                           className="w-full bg-[#fffaf0] border-2 border-[#0a0a0a]/15 rounded-xl px-4 py-3 text-sm font-semibold text-[#0a0a0a] focus:outline-none focus:border-[#0a0a0a]"
@@ -289,7 +302,6 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
                         <input
                           type="text"
                           required
-                          value={school}
                           onChange={(e) => setSchool(e.target.value)}
                           placeholder="SMAN 1 Cirebon"
                           className="w-full bg-[#fffaf0] border-2 border-[#0a0a0a]/15 rounded-xl px-4 py-3 text-sm font-semibold text-[#0a0a0a] focus:outline-none focus:border-[#0a0a0a]"
@@ -307,8 +319,8 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
                           type="button"
                           onClick={() => handleCategoryChange('SD')}
                           className={`py-2.5 px-2 rounded-xl text-center border-2 transition-all cursor-pointer ${category === 'SD'
-                              ? 'bg-[#ffb084] border-[#0a0a0a] text-[#0a0a0a] font-extrabold shadow-sm'
-                              : 'bg-[#fffaf0] border-[#0a0a0a]/15 text-[#6a6a6a]'
+                            ? 'bg-[#ffb084] border-[#0a0a0a] text-[#0a0a0a] font-extrabold shadow-sm'
+                            : 'bg-[#fffaf0] border-[#0a0a0a]/15 text-[#6a6a6a]'
                             }`}
                         >
                           <div className="text-xs font-bold">SD / MI</div>
@@ -317,8 +329,8 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
                           type="button"
                           onClick={() => handleCategoryChange('SMP')}
                           className={`py-2.5 px-2 rounded-xl text-center border-2 transition-all cursor-pointer ${category === 'SMP'
-                              ? 'bg-[#b8a4ed] border-[#0a0a0a] text-[#0a0a0a] font-extrabold shadow-sm'
-                              : 'bg-[#fffaf0] border-[#0a0a0a]/15 text-[#6a6a6a]'
+                            ? 'bg-[#b8a4ed] border-[#0a0a0a] text-[#0a0a0a] font-extrabold shadow-sm'
+                            : 'bg-[#fffaf0] border-[#0a0a0a]/15 text-[#6a6a6a]'
                             }`}
                         >
                           <div className="text-xs font-bold">SMP / MTs</div>
@@ -327,8 +339,8 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
                           type="button"
                           onClick={() => handleCategoryChange('SMA')}
                           className={`py-2.5 px-2 rounded-xl text-center border-2 transition-all cursor-pointer ${category === 'SMA'
-                              ? 'bg-[#e8b94a] border-[#0a0a0a] text-[#0a0a0a] font-extrabold shadow-sm'
-                              : 'bg-[#fffaf0] border-[#0a0a0a]/15 text-[#6a6a6a]'
+                            ? 'bg-[#e8b94a] border-[#0a0a0a] text-[#0a0a0a] font-extrabold shadow-sm'
+                            : 'bg-[#fffaf0] border-[#0a0a0a]/15 text-[#6a6a6a]'
                             }`}
                         >
                           <div className="text-xs font-bold">SMA / SMK / MA</div>
@@ -352,8 +364,8 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
                         <input
                           type="text"
                           required
-                          value={teacherName}
                           onChange={(e) => setTeacherName(e.target.value)}
+                          placeholder={teacherName}
                           className="w-full bg-[#fffaf0] border-2 border-[#0a0a0a]/15 rounded-xl px-3 py-2 text-sm font-semibold"
                         />
                       </div>
@@ -362,8 +374,8 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
                         <input
                           type="tel"
                           required
-                          value={teacherPhone}
                           onChange={(e) => setTeacherPhone(e.target.value)}
+                          placeholder={teacherPhone}
                           className="w-full bg-[#fffaf0] border-2 border-[#0a0a0a]/15 rounded-xl px-3 py-2 text-sm font-semibold"
                         />
                       </div>
@@ -405,11 +417,10 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
               /* Login Form */
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-[#0a0a0a] uppercase mb-1">Email Peserta</label>
+                  <label className="block text-xs font-bold text-[#0a0a0a] uppercase mb-1">Email Peserta / Admin</label>
                   <input
                     type="email"
                     required
-                    value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="peserta@sekolah.sch.id"
                     className="w-full bg-[#fffaf0] border-2 border-[#0a0a0a]/15 rounded-xl px-4 py-3 text-sm font-semibold"
@@ -420,12 +431,52 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
                   <input
                     type="password"
                     required
-                    value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     className="w-full bg-[#fffaf0] border-2 border-[#0a0a0a]/15 rounded-xl px-4 py-3 text-sm font-semibold"
                   />
                 </div>
+
+                {/* Demo Accounts Quick Login Selector */}
+                <div className="bg-[#f8f3e9] p-3.5 rounded-2xl border border-[#0a0a0a]/10 space-y-2 mt-4">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-[#6a6a6a] flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-sm text-[#e8b94a]">bolt</span>
+                    <span>Uji Coba Akun Demo (Satu Klik):</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEmail('admin@matholympiad.id');
+                        setPassword('admin123');
+                        executeLogin('admin@matholympiad.id', 'admin123');
+                      }}
+                      className="bg-[#b8a4ed]/30 hover:bg-[#b8a4ed]/50 text-[#0a0a0a] text-xs font-bold py-2.5 px-3 rounded-xl border border-[#0a0a0a]/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-base text-[#6b42c9]">admin_panel_settings</span>
+                      <span>Masuk sebagai Admin</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEmail('andi@sekolah.sch.id');
+                        setPassword('peserta123');
+                        executeLogin('andi@sekolah.sch.id', 'peserta123');
+                      }}
+                      className="bg-[#a4d4c5]/30 hover:bg-[#a4d4c5]/50 text-[#0a0a0a] text-xs font-bold py-2.5 px-3 rounded-xl border border-[#0a0a0a]/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-base text-[#1a3a3a]">school</span>
+                      <span>Masuk sebagai Peserta</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {errorMessage && (
+              <div className="bg-[#ff6b5a]/15 border border-[#ff6b5a] text-[#a82415] rounded-xl p-3.5 text-xs font-bold flex items-start gap-2 animate-in fade-in duration-200">
+                <span className="material-symbols-outlined text-lg shrink-0 mt-0.5">error</span>
+                <span>{errorMessage}</span>
               </div>
             )}
 

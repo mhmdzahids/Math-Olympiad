@@ -27,7 +27,7 @@ export interface CompetitionRound {
   questionCount: number;
   durationMinutes: number;
   tabSwitchLimit: number;
-  status: 'submitted' | 'active' | 'locked';
+  status: 'submitted' | 'active' | 'locked' | 'draft' | 'upcoming' | 'completed';
   isFinal?: boolean;
   executionMode?: 'online' | 'offline';
   startDate?: string;
