@@ -61,6 +61,19 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
     return { isBefore, isAfter, isOpen, sDate, sTime, eDate, eTime };
   }
 
+  function formatTanggalID(dateStr: string, timeStr: string): string {
+    const bulan = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return `${dateStr}, ${timeStr.replace(':', '.')} WIB`;
+    const [tahun, bln, hari] = parts;
+    const namaBulan = bulan[parseInt(bln, 10) - 1] || bln;
+    const jam = timeStr.replace(':', '.');
+    return `${parseInt(hari, 10)} ${namaBulan} ${tahun}, ${jam} WIB`;
+  }
+
   const displayedRounds = rounds.filter((r) => (r.category || 'SD') === selectedCategory);
 
   return (
@@ -224,7 +237,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
                         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pt-4 border-t-2 border-[#0a0a0a]/15 relative z-10">
                           <div className="text-xs text-[#0a0a0a]/80 font-bold">
-                            Jadwal Ujian: <strong className="text-[#0a0a0a] font-black">{sDate} ({sTime} WIB) s.d {eDate} ({eTime} WIB)</strong>
+                            Jadwal Ujian: <strong className="text-[#0a0a0a] font-black">{formatTanggalID(sDate, sTime)} s.d {formatTanggalID(eDate, eTime)}</strong>
                           </div>
 
                           {!isOffline && (

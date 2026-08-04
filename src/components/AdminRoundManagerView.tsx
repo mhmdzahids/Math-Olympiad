@@ -3,6 +3,7 @@ import { ScreenView, CompetitionRound, ParsedQuestion } from '../types';
 import { INITIAL_ROUNDS, INITIAL_PARSED_QUESTIONS, ASSET_IMAGES } from '../data/mockData';
 import { parseDocxFile, generateSampleTemplateText } from '../utils/docxParser';
 import { apiService } from '../services/api';
+import { MathText } from './MathText';
 
 interface AdminRoundManagerViewProps {
   onNavigate: (screen: ScreenView) => void;
@@ -12,6 +13,7 @@ interface AdminRoundManagerViewProps {
   highlightSaveTrigger?: number;
   selectedRoundTitle?: string;
   onSelectRound?: (roundTitle: string) => void;
+  onShowToast?: (message: string, type?: 'success' | 'info' | 'warning', title?: string) => void;
 }
 
 export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
@@ -21,7 +23,8 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
   onEditModeChange,
   highlightSaveTrigger,
   selectedRoundTitle,
-  onSelectRound
+  onSelectRound,
+  onShowToast,
 }) => {
   const [localRounds, setLocalRounds] = useState<CompetitionRound[]>(propsRounds || INITIAL_ROUNDS);
   const currentRounds = propsRounds || localRounds;
@@ -45,6 +48,7 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
   const [dbQuestionsCount, setDbQuestionsCount] = useState<number>(0);
   const [isLoadingDbQuestions, setIsLoadingDbQuestions] = useState<boolean>(false);
   const [showImportOptionsModal, setShowImportOptionsModal] = useState<boolean>(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const roundCardsContainerRef = useRef<HTMLDivElement>(null);
 
   // Load existing questions from DB when expanding a round
@@ -227,8 +231,7 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
     }
 
     if (showAlert) {
-      alert('Pengaturan babak berhasil diperbarui dan disimpan!');
-      window.location.reload();
+      onShowToast?.('Pengaturan babak berhasil diperbarui dan disimpan!', 'success', 'Pengaturan Disimpan');
     }
   };
 
@@ -262,8 +265,8 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
     }
   };
 
-  const handleDeleteRound = async (roundId: string, roundTitle: string) => {
-    if (window.confirm(`Apakah Anda yakin ingin menghapus "${roundTitle}"?`)) {
+  const handleDeleteRound = async (roundId: string, roundTitle?: string) => {
+    if (window.confirm(`Apakah Anda yakin ingin menghapus babak "${roundTitle || 'ini'}"?`)) {
       try {
         await apiService.deleteRound(roundId);
       } catch (err) {
@@ -274,6 +277,12 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
       if (expandedRoundId === roundId) {
         setExpandedRoundId('');
       }
+      // Otomatis tersimpan ke DB & keluar dari mode edit
+      setIsEditingSettings(false);
+      setIsSaveHighlighted(false);
+      setRoundsBackup(null);
+      if (onEditModeChange) onEditModeChange(false);
+      onShowToast?.(`Babak "${roundTitle || ''}" berhasil dihapus!`, 'info', 'Babak Dihapus');
     }
   };
 
@@ -744,8 +753,8 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                   setExpandedRoundId('');
                   setParsedQuestions([]);
                 }}
-                className={`px-6 py-2 rounded-full font-extrabold text-xs sm:text-sm transition-all cursor-pointer border-0 ${selectedCategoryTab === 'SD'
-                  ? 'bg-[#ffb084] text-[#0a0a0a] ring-2 ring-[#ffb084] ring-offset-2 ring-offset-[#fef9ef] shadow-2xs'
+                className={`px-6 py-2 rounded-full font-extrabold text-xs sm:text-sm transition-all cursor-pointer ${selectedCategoryTab === 'SD'
+                  ? 'bg-[#ffb084] text-[#0a0a0a] border-2 border-[#0a0a0a] clay-shadow-sm'
                   : 'bg-[#ebe6d6] text-[#555d65] hover:bg-[#e2dccb] hover:text-[#0a0a0a]'
                   }`}
               >
@@ -759,8 +768,8 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                   setExpandedRoundId('');
                   setParsedQuestions([]);
                 }}
-                className={`px-6 py-2 rounded-full font-extrabold text-xs sm:text-sm transition-all cursor-pointer border-0 ${selectedCategoryTab === 'SMP'
-                  ? 'bg-[#b8a4ed] text-[#0a0a0a] ring-2 ring-[#b8a4ed] ring-offset-2 ring-offset-[#fef9ef] shadow-2xs'
+                className={`px-6 py-2 rounded-full font-extrabold text-xs sm:text-sm transition-all cursor-pointer ${selectedCategoryTab === 'SMP'
+                  ? 'bg-[#b8a4ed] text-[#0a0a0a] border-2 border-[#0a0a0a] clay-shadow-sm'
                   : 'bg-[#ebe6d6] text-[#555d65] hover:bg-[#e2dccb] hover:text-[#0a0a0a]'
                   }`}
               >
@@ -774,8 +783,8 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                   setExpandedRoundId('');
                   setParsedQuestions([]);
                 }}
-                className={`px-6 py-2 rounded-full font-extrabold text-xs sm:text-sm transition-all cursor-pointer border-0 ${selectedCategoryTab === 'SMA'
-                  ? 'bg-[#e8b94a] text-[#0a0a0a] ring-2 ring-[#e8b94a] ring-offset-2 ring-offset-[#fef9ef] shadow-2xs'
+                className={`px-6 py-2 rounded-full font-extrabold text-xs sm:text-sm transition-all cursor-pointer ${selectedCategoryTab === 'SMA'
+                  ? 'bg-[#e8b94a] text-[#0a0a0a] border-2 border-[#0a0a0a] clay-shadow-sm'
                   : 'bg-[#ebe6d6] text-[#555d65] hover:bg-[#e2dccb] hover:text-[#0a0a0a]'
                   }`}
               >
@@ -788,7 +797,7 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
             {/* Accordion List */}
             <div ref={roundCardsContainerRef} className="space-y-3">
               {currentRounds
-                .filter((r) => (r.category || 'SD') === selectedCategoryTab)
+                .filter((r) => (r.category || 'SD').toUpperCase() === selectedCategoryTab)
                 .map((round) => {
                   const isExpanded = expandedRoundId === round.id;
                   const isOffline = round.executionMode === 'offline';
@@ -796,9 +805,9 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                   return (
                     <div
                       key={round.id}
-                      className={`rounded-2xl p-4 border transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] relative ${isExpanded
-                        ? 'bg-[#fef9ef] border-[#feaf83]/30 ring-2 ring-[#feaf83]/20 shadow-md'
-                        : 'bg-[#f5f0e0] border-[#0a0a0a]/10 hover:bg-[#ebe6d6]'
+                      className={`rounded-[24px] p-4 sm:p-5 border-2 transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] relative ${isExpanded
+                        ? 'bg-[#fef9ef] border-[#0a0a0a]/20 clay-shadow ring-2 ring-[#feaf83]/20'
+                        : 'bg-[#f5f0e0] border-[#0a0a0a]/10 hover:bg-[#ebe6d6] clay-shadow-sm'
                         }`}
                     >
                       <div
@@ -864,7 +873,8 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                                   value={round.title}
                                   onChange={(e) => handleUpdateTitle(round.id, e.target.value)}
                                   placeholder="Masukkan Nama Babak..."
-                                  className="w-full px-3 py-2 text-xs sm:text-sm font-black text-[#0a0a0a] bg-white rounded-xl border border-[#0a0a0a]/30 focus:border-[#0a0a0a] focus:ring-2 focus:ring-[#0a0a0a]/10 shadow-2xs transition-all"
+                                  disabled={!isEditingSettings}
+                                  className={`w-full px-3 py-2 text-xs sm:text-sm font-black text-[#0a0a0a] bg-white rounded-xl border border-[#0a0a0a]/30 focus:border-[#0a0a0a] focus:ring-2 focus:ring-[#0a0a0a]/10 shadow-2xs transition-all ${!isEditingSettings ? 'opacity-60 cursor-not-allowed' : ''}`}
                                 />
                               </div>
 
@@ -873,13 +883,14 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                                   <span className="material-symbols-outlined text-base text-[#0a0a0a]">format_list_numbered</span>
                                   <span>JUMLAH SOAL</span>
                                 </label>
-                                <div className="flex items-center gap-2 border border-[#0a0a0a]/30 px-3 py-2 rounded-xl bg-white">
+                                <div className={`flex items-center gap-2 border border-[#0a0a0a]/30 px-3 py-2 rounded-xl bg-white ${!isEditingSettings ? 'opacity-60' : ''}`}>
                                   <input
                                     type="number"
                                     onFocus={ensureEditMode}
                                     value={round.questionCount || ''}
                                     onChange={(e) => handleUpdateQuestionCount(round.id, e.target.value === '' ? 0 : (parseInt(e.target.value, 10) || 0))}
-                                    className="font-black text-xs sm:text-sm bg-transparent border-none focus:outline-none w-full text-[#0a0a0a]"
+                                    disabled={!isEditingSettings}
+                                    className={`font-black text-xs sm:text-sm bg-transparent border-none focus:outline-none w-full text-[#0a0a0a] ${!isEditingSettings ? 'cursor-not-allowed' : ''}`}
                                   />
                                   <span className="text-xs text-[#6a6a6a] font-bold shrink-0">Soal</span>
                                 </div>
@@ -894,11 +905,12 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                                 </label>
                               </div>
 
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                              <div className={`grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 ${!isEditingSettings ? 'opacity-60 pointer-events-none' : ''}`}>
                                 <button
                                   type="button"
                                   onClick={() => handleUpdateExecutionMode(round.id, 'online')}
-                                  className={`py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border-2 transition-all cursor-pointer hover:border-[#0a0a0a] ${!isOffline
+                                  disabled={!isEditingSettings}
+                                  className={`py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border-2 transition-all ${isEditingSettings ? 'cursor-pointer hover:border-[#0a0a0a]' : 'cursor-not-allowed'} ${!isOffline
                                     ? 'bg-[#b8a4ed] border-[#0a0a0a] text-[#0a0a0a] shadow-xs'
                                     : 'bg-white border-[#0a0a0a]/15 text-[#6a6a6a]'
                                     }`}
@@ -910,7 +922,8 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                                 <button
                                   type="button"
                                   onClick={() => handleUpdateExecutionMode(round.id, 'offline')}
-                                  className={`py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border-2 transition-all cursor-pointer hover:border-[#0a0a0a] ${isOffline
+                                  disabled={!isEditingSettings}
+                                  className={`py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border-2 transition-all ${isEditingSettings ? 'cursor-pointer hover:border-[#0a0a0a]' : 'cursor-not-allowed'} ${isOffline
                                     ? 'bg-[#feaf83] border-[#0a0a0a] text-[#0a0a0a] shadow-xs'
                                     : 'bg-white border-[#0a0a0a]/15 text-[#6a6a6a]'
                                     }`}
@@ -941,25 +954,27 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                                 <div className="space-y-1">
                                   <span className="text-[10px] font-bold text-[#6a6a6a] uppercase block tracking-wider">Tanggal & Jam Mulai</span>
                                   <div className="flex gap-2">
-                                    <div className="flex-1 flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#0a0a0a]/30 focus-within:border-[#0a0a0a] focus-within:ring-2 focus-within:ring-[#0a0a0a]/10 shadow-2xs bg-white transition-all">
+                                    <div className={`flex-1 flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#0a0a0a]/30 focus-within:border-[#0a0a0a] focus-within:ring-2 focus-within:ring-[#0a0a0a]/10 shadow-2xs bg-white transition-all ${!isEditingSettings ? 'opacity-60' : ''}`}>
                                       <span className="material-symbols-outlined text-[#6a6a6a] text-base shrink-0">calendar_month</span>
                                       <input
                                         type="date"
                                         onFocus={ensureEditMode}
                                         value={round.startDate || '2026-08-01'}
                                         onChange={(e) => handleUpdateSchedule(round.id, 'startDate', e.target.value)}
-                                        className="w-full text-xs font-black text-[#0a0a0a] bg-transparent focus:outline-none cursor-pointer"
+                                        disabled={!isEditingSettings}
+                                        className={`w-full text-xs font-black text-[#0a0a0a] bg-transparent focus:outline-none ${isEditingSettings ? 'cursor-pointer' : 'cursor-not-allowed'}`}
                                       />
                                     </div>
 
-                                    <div className="w-32 flex items-center gap-1.5 px-2.5 py-2 rounded-xl border border-[#0a0a0a]/30 focus-within:border-[#0a0a0a] focus-within:ring-2 focus-within:ring-[#0a0a0a]/10 shadow-2xs bg-white transition-all">
+                                    <div className={`w-32 flex items-center gap-1.5 px-2.5 py-2 rounded-xl border border-[#0a0a0a]/30 focus-within:border-[#0a0a0a] focus-within:ring-2 focus-within:ring-[#0a0a0a]/10 shadow-2xs bg-white transition-all ${!isEditingSettings ? 'opacity-60' : ''}`}>
                                       <span className="material-symbols-outlined text-[#6a6a6a] text-base shrink-0">schedule</span>
                                       <input
                                         type="time"
                                         onFocus={ensureEditMode}
                                         value={round.startTime || '08:00'}
                                         onChange={(e) => handleUpdateSchedule(round.id, 'startTime', e.target.value)}
-                                        className="w-full text-xs font-black text-[#0a0a0a] bg-transparent focus:outline-none cursor-pointer"
+                                        disabled={!isEditingSettings}
+                                        className={`w-full text-xs font-black text-[#0a0a0a] bg-transparent focus:outline-none ${isEditingSettings ? 'cursor-pointer' : 'cursor-not-allowed'}`}
                                       />
                                     </div>
                                   </div>
@@ -969,25 +984,27 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                                 <div className="space-y-1">
                                   <span className="text-[10px] font-bold text-[#6a6a6a] uppercase block tracking-wider">Tanggal & Jam Selesai</span>
                                   <div className="flex gap-2">
-                                    <div className="flex-1 flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#0a0a0a]/30 focus-within:border-[#0a0a0a] focus-within:ring-2 focus-within:ring-[#0a0a0a]/10 shadow-2xs bg-white transition-all">
+                                    <div className={`flex-1 flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#0a0a0a]/30 focus-within:border-[#0a0a0a] focus-within:ring-2 focus-within:ring-[#0a0a0a]/10 shadow-2xs bg-white transition-all ${!isEditingSettings ? 'opacity-60' : ''}`}>
                                       <span className="material-symbols-outlined text-[#6a6a6a] text-base shrink-0">event_available</span>
                                       <input
                                         type="date"
                                         onFocus={ensureEditMode}
                                         value={round.endDate || '2026-08-10'}
                                         onChange={(e) => handleUpdateSchedule(round.id, 'endDate', e.target.value)}
-                                        className="w-full text-xs font-black text-[#0a0a0a] bg-transparent focus:outline-none cursor-pointer"
+                                        disabled={!isEditingSettings}
+                                        className={`w-full text-xs font-black text-[#0a0a0a] bg-transparent focus:outline-none ${isEditingSettings ? 'cursor-pointer' : 'cursor-not-allowed'}`}
                                       />
                                     </div>
 
-                                    <div className="w-32 flex items-center gap-1.5 px-2.5 py-2 rounded-xl border border-[#0a0a0a]/30 focus-within:border-[#0a0a0a] focus-within:ring-2 focus-within:ring-[#0a0a0a]/10 shadow-2xs bg-white transition-all">
+                                    <div className={`w-32 flex items-center gap-1.5 px-2.5 py-2 rounded-xl border border-[#0a0a0a]/30 focus-within:border-[#0a0a0a] focus-within:ring-2 focus-within:ring-[#0a0a0a]/10 shadow-2xs bg-white transition-all ${!isEditingSettings ? 'opacity-60' : ''}`}>
                                       <span className="material-symbols-outlined text-[#6a6a6a] text-base shrink-0">history_toggle_off</span>
                                       <input
                                         type="time"
                                         onFocus={ensureEditMode}
                                         value={round.endTime || '18:00'}
                                         onChange={(e) => handleUpdateSchedule(round.id, 'endTime', e.target.value)}
-                                        className="w-full text-xs font-black text-[#0a0a0a] bg-transparent focus:outline-none cursor-pointer"
+                                        disabled={!isEditingSettings}
+                                        className={`w-full text-xs font-black text-[#0a0a0a] bg-transparent focus:outline-none ${isEditingSettings ? 'cursor-pointer' : 'cursor-not-allowed'}`}
                                       />
                                     </div>
                                   </div>
@@ -1146,7 +1163,7 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                                 <label className="text-[10px] font-bold text-[#6a6a6a] uppercase tracking-wider">
                                   DURASI WAKTU
                                 </label>
-                                <div className="flex items-center gap-2 border border-[#0a0a0a]/20 px-3 py-2 rounded-xl bg-[#fffaf0]">
+                                <div className={`flex items-center gap-2 border border-[#0a0a0a]/20 px-3 py-2 rounded-xl bg-[#fffaf0] ${!isEditingSettings ? 'opacity-60' : ''}`}>
                                   <span className="material-symbols-outlined text-[#6a6a6a] text-[20px]">
                                     timer
                                   </span>
@@ -1157,7 +1174,8 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                                     onChange={(e) =>
                                       handleUpdateDuration(round.id, e.target.value === '' ? 0 : (parseInt(e.target.value, 10) || 0))
                                     }
-                                    className="font-bold text-sm bg-transparent border-none focus:outline-none w-16 text-[#0a0a0a]"
+                                    disabled={!isEditingSettings}
+                                    className={`font-bold text-sm bg-transparent border-none focus:outline-none w-16 text-[#0a0a0a] ${!isEditingSettings ? 'cursor-not-allowed' : ''}`}
                                   />
                                   <span className="text-xs text-[#6a6a6a] font-semibold">Menit</span>
                                 </div>
@@ -1169,7 +1187,7 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                                   <label className="text-[10px] font-bold text-[#6a6a6a] uppercase tracking-wider">
                                     BATAS PINDAH TAB
                                   </label>
-                                  <div className="flex items-center gap-2 border border-[#0a0a0a]/20 px-3 py-2 rounded-xl bg-[#fffaf0]">
+                                  <div className={`flex items-center gap-2 border border-[#0a0a0a]/20 px-3 py-2 rounded-xl bg-[#fffaf0] ${!isEditingSettings ? 'opacity-60' : ''}`}>
                                     <span className="material-symbols-outlined text-[#6a6a6a] text-[20px]">
                                       security
                                     </span>
@@ -1180,7 +1198,8 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                                       onChange={(e) =>
                                         handleUpdateTabLimit(round.id, e.target.value === '' ? 0 : (parseInt(e.target.value, 10) || 0))
                                       }
-                                      className="font-bold text-sm bg-transparent border-none focus:outline-none w-12 text-[#0a0a0a]"
+                                      disabled={!isEditingSettings}
+                                      className={`font-bold text-sm bg-transparent border-none focus:outline-none w-12 text-[#0a0a0a] ${!isEditingSettings ? 'cursor-not-allowed' : ''}`}
                                     />
                                     <span className="text-xs text-[#6a6a6a] font-semibold">Kali</span>
                                   </div>
@@ -1188,26 +1207,19 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                               )}
                             </div>
 
-                            {/* Bottom Action Bar: Delete & Save Round Buttons */}
-                            <div className="flex items-center justify-between pt-3 mt-2 border-t border-[#ebe6d6]">
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteRound(round.id, round.title)}
-                                className="px-4 py-2 bg-[#ff6b5a]/10 hover:bg-[#ff6b5a]/20 text-[#d32f2f] font-extrabold text-xs rounded-xl flex items-center gap-1.5 transition-all cursor-pointer border border-[#ff6b5a]/30 shadow-2xs"
-                              >
-                                <span className="material-symbols-outlined text-base">delete</span>
-                                <span>Hapus Babak Ini</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => handleSaveEditing(true)}
-                                className="px-5 py-2.5 bg-[#0a0a0a] hover:bg-[#1a1a1a] text-white font-extrabold text-xs sm:text-sm rounded-xl flex items-center gap-2 transition-all cursor-pointer shadow-md active:scale-95 border border-transparent"
-                              >
-                                <span className="material-symbols-outlined text-base">save</span>
-                                <span>Simpan Perubahan Babak</span>
-                              </button>
-                            </div>
+                            {/* Bottom Action Bar: Delete Round Button (only in edit mode) */}
+                            {isEditingSettings && (
+                              <div className="flex items-center pt-3 mt-2 border-t border-[#ebe6d6]">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteRound(round.id, round.title)}
+                                  className="px-4 py-2 bg-[#ff6b5a]/10 hover:bg-[#ff6b5a]/20 text-[#d32f2f] font-extrabold text-xs rounded-xl flex items-center gap-1.5 transition-all cursor-pointer border border-[#ff6b5a]/30 shadow-2xs"
+                                >
+                                  <span className="material-symbols-outlined text-base">delete</span>
+                                  <span>Hapus Babak Ini</span>
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1234,7 +1246,7 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
 
         {/* Section 2 & 3: Importer & Live Preview (Rendered when a round card is selected) */}
         {!activeExpandedRound ? (
-          <div className="bg-[#fffaf0] rounded-3xl border-2 border-dashed border-[#0a0a0a]/20 p-8 sm:p-12 text-center space-y-3 my-6 animate-in fade-in duration-200">
+          <div className="bg-[#fffaf0] rounded-[28px] border-2 border-dashed border-[#0a0a0a]/20 clay-shadow p-8 sm:p-12 text-center space-y-3 my-6 animate-in fade-in duration-200">
             <div className="w-16 h-16 bg-[#e8b94a]/20 rounded-2xl flex items-center justify-center mx-auto text-[#0a0a0a]">
               <span className="material-symbols-outlined text-4xl text-[#e8b94a]">touch_app</span>
             </div>
@@ -1249,7 +1261,7 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
           <>
             {/* Section 2: Question Importer Panel */}
             <section className="space-y-4">
-              <div className="bg-[#f5f0e0] rounded-2xl overflow-hidden border border-[#0a0a0a]/10 shadow-xs">
+              <div className="bg-[#f5f0e0] rounded-[28px] overflow-hidden border-2 border-[#0a0a0a]/10 clay-shadow">
                 <div className={`p-4 sm:p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 transition-colors ${isSelectedRoundOffline ? 'bg-[#feaf83]' : 'bg-[#b8a4ed]'
                   }`}>
                   <div className="flex items-center gap-3">
@@ -1293,7 +1305,7 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                 </div>
 
                 <div className="p-6 sm:p-10 space-y-4">
-                  <label className="border-2 border-dashed border-[#c4c7c7] hover:border-[#0a0a0a] rounded-2xl p-8 sm:p-12 flex flex-col items-center justify-center bg-[#fffaf0]/50 group transition-colors cursor-pointer text-center block">
+                  <label className="border-2 border-dashed border-[#0a0a0a]/20 hover:border-[#0a0a0a] rounded-[24px] p-8 sm:p-12 flex flex-col items-center justify-center bg-[#fffaf0]/60 group transition-colors cursor-pointer text-center block clay-shadow-sm">
                     <input
                       type="file"
                       accept={isSelectedRoundOffline ? '.pdf,.ppt,.pptx' : '.docx,.doc,.txt'}
@@ -1310,7 +1322,7 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                         <img
                           src={ASSET_IMAGES.documentIcon}
                           alt="Ikon Dokumen"
-                          className="w-20 h-20 group-hover:scale-110 transition-transform object-contain"
+                          className="w-20 h-20 group-hover:scale-110 transition-transform object-contain drop-shadow-md"
                         />
                       )}
                     </div>
@@ -1325,7 +1337,7 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                         : 'Format yang didukung: .docx, .doc, .txt (Maks 20MB)'}
                     </p>
                     <div className="mt-4 flex flex-wrap justify-center gap-2">
-                      <span className="bg-[#0a0a0a] text-white font-bold text-xs px-6 py-2.5 rounded-xl transition-all shadow-xs inline-flex items-center gap-1.5">
+                      <span className="bg-[#0a0a0a] hover:bg-[#1a1a1a] text-white font-bold text-xs px-6 py-2.5 rounded-xl clay-shadow-sm clay-button-active transition-all inline-flex items-center gap-1.5 cursor-pointer border border-[#0a0a0a]">
                         <span className="material-symbols-outlined text-sm">upload_file</span>
                         <span>{isSelectedRoundOffline ? 'Pilih Berkas PDF / PPT' : 'Pilih Berkas Word (.docx)'}</span>
                       </span>
@@ -1337,7 +1349,7 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                             e.stopPropagation();
                             handleDownloadTemplate();
                           }}
-                          className="bg-[#ebe6d6] hover:bg-[#e7e2d8] text-[#0a0a0a] font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-xs inline-flex items-center gap-1.5 cursor-pointer"
+                          className="bg-[#ebe6d6] hover:bg-[#e7e2d8] text-[#0a0a0a] font-bold text-xs px-4 py-2.5 rounded-xl clay-shadow-sm clay-button-active transition-all inline-flex items-center gap-1.5 cursor-pointer border border-[#0a0a0a]/10"
                         >
                           <span className="material-symbols-outlined text-sm text-[#e8b94a]">download</span>
                           <span>Unduh Template Format Soal</span>
@@ -1375,7 +1387,7 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                 </span>
               </div>
 
-              <div className="bg-[#f5f0e0] rounded-2xl overflow-hidden border border-[#0a0a0a]/10 shadow-xs">
+              <div className="bg-white rounded-[28px] overflow-hidden border-2 border-[#0a0a0a]/10 clay-shadow">
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse text-left text-sm">
                     <thead>
@@ -1405,7 +1417,7 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                               </p>
                             ) : (
                               <div className="space-y-1.5">
-                                <p className="text-[#1d1c16] line-clamp-2">{pq.questionText}</p>
+                                <p className="text-[#1d1c16] line-clamp-2"><MathText text={pq.questionText} /></p>
                                 {pq.imageUrl && (
                                   <div className="flex items-center gap-2">
                                     <img
@@ -1434,7 +1446,7 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                                     key={opt.key}
                                     className="text-xs bg-[#fffaf0] px-2 py-1 rounded-lg border border-[#0a0a0a]/10 font-medium"
                                   >
-                                    {opt.key}: {opt.text}
+                                    {opt.key}: <MathText text={opt.text} />
                                   </span>
                                 ))}
                               </div>

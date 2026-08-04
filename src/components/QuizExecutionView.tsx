@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ScreenView, Question, CompetitionRound } from '../types';
 import { MOCK_QUESTIONS, ASSET_IMAGES } from '../data/mockData';
 import { apiService } from '../services/api';
+import { MathText } from './MathText';
 
 interface QuizExecutionViewProps {
   onNavigate: (screen: ScreenView) => void;
@@ -31,6 +32,9 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
   const [showAntiCheatModal, setShowAntiCheatModal] = useState<boolean>(false);
   const [lastActivityLog, setLastActivityLog] = useState<string>('');
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
+
+  // Ref to prevent double-triggering when both 'blur' and 'visibilitychange' fire for 1 tab switch
+  const lastViolationTimeRef = useRef<number>(0);
 
   // Anti-Cheat: Disable Copy, Paste & Context Menu
   useEffect(() => {
@@ -133,13 +137,20 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
     return () => clearInterval(interval);
   }, [isSubmitted, loadingQuestions, activeRound, userAnswers]);
 
-  // Tab switch & Window Focus Mode Listener with Server Log
+  // Tab switch & Window Focus Mode Listener with Server Log (Debounced)
   useEffect(() => {
     if (isSubmitted || loadingQuestions) return;
 
     const handleBlur = async () => {
-      const now = new Date();
-      setLastActivityLog(now.toLocaleTimeString());
+      const now = Date.now();
+      // Debounce: ignore duplicate triggers occurring within 1.5 seconds (prevents double count from blur + visibilitychange)
+      if (now - lastViolationTimeRef.current < 1500) {
+        return;
+      }
+      lastViolationTimeRef.current = now;
+
+      const dateObj = new Date();
+      setLastActivityLog(dateObj.toLocaleTimeString());
       setShowAntiCheatModal(true);
 
       if (activeRound?.id && isValidUUID(activeRound.id)) {
@@ -287,11 +298,11 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
                 {currentQ.code || `SOAL ${currentQ.id}`}
               </span>
               <h1 className="text-lg sm:text-xl font-bold text-[#000000] leading-snug">
-                {currentQ.text}
+                <MathText text={currentQ.text} />
               </h1>
               {currentQ.note && (
                 <p className="text-sm text-[#6a6a6a] italic">
-                  {currentQ.note}
+                  <MathText text={currentQ.note} />
                 </p>
               )}
             </div>
@@ -338,7 +349,7 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
                     {opt.id}
                   </div>
                   <span className={`text-sm sm:text-base ${isSelected ? 'font-bold text-[#0a0a0a]' : 'font-medium text-[#1d1c16]'}`}>
-                    {opt.text}
+                    <MathText text={opt.text} />
                   </span>
                   {isSelected && (
                     <span className="ml-auto material-symbols-outlined text-[#e8b94a]">

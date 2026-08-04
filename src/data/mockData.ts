@@ -153,19 +153,64 @@ export const INITIAL_ROUNDS: CompetitionRound[] = [
 
 export const MOCK_QUESTIONS: Question[] = Array.from({ length: 30 }).map((_, idx) => {
   const num = idx + 1;
+  if (num === 1) {
+    return {
+      id: 1,
+      code: 'TEORI BILANGAN • MATRIX',
+      text: 'Hitunglah nilai dari ekspresi polinomial $P(x) = x^3 + 1x - 3$ ketika $x = 3$.',
+      note: 'Pilih jawaban yang menyatakan nilai tepat.',
+      options: [
+        { id: 'A', text: '$27$' },
+        { id: 'B', text: '$12$' },
+        { id: 'C', text: '$25$' },
+        { id: 'D', text: '$8$' }
+      ],
+      correctOption: 'A'
+    };
+  }
+  if (num === 2) {
+    return {
+      id: 2,
+      code: 'ALJABAR • OPTIMA 2026',
+      text: 'Jika $a + b = 10$ dan $a^2 + b^2 = 52$, berapakah nilai dari $a \\times b$?',
+      note: 'Gunakan identitas $(a+b)^2 = a^2 + 2ab + b^2$.',
+      options: [
+        { id: 'A', text: '$24$' },
+        { id: 'B', text: '$26$' },
+        { id: 'C', text: '$30$' },
+        { id: 'D', text: '$32$' }
+      ],
+      correctOption: 'A'
+    };
+  }
+  if (num === 3) {
+    return {
+      id: 3,
+      code: 'KALKULUS • MATRIX OPTIMA',
+      text: 'Tentukan nilai dari limit trigonometri: $\\lim_{x \\to 0} \\frac{\\sin(4x)}{2x}$.',
+      note: 'Pilih jawaban yang paling sederhana.',
+      options: [
+        { id: 'A', text: '$1$' },
+        { id: 'B', text: '$2$' },
+        { id: 'C', text: '$4$' },
+        { id: 'D', text: '$\\frac{1}{2}$' }
+      ],
+      correctOption: 'B'
+    };
+  }
   if (num === 12) {
     return {
       id: 12,
       code: 'GEOMETRI • MATRIX OPTIMA',
-      text: 'Sebuah tabung pejal memiliki jari-jari 4 cm dan tinggi 10 cm. Jika tabung ini dibentuk ulang menjadi sebuah bola sempurna, berapakah volume bola tersebut?',
-      note: 'Catatan: Asumsikan tidak ada volume yang hilang selama proses pembentukan ulang. Gunakan π ≈ 3.14.',
+      text: 'Sebuah tabung pejal memiliki jari-jari $r = 4\\text{ cm}$ dan tinggi $h = 10\\text{ cm}$. Jika tabung ini dibentuk ulang menjadi sebuah bola sempurna, berapakah volume bola tersebut?',
+      note: 'Catatan: Asumsikan tidak ada volume yang hilang. Gunakan $\\pi \\approx 3.14$.',
       diagramUrl: ASSET_IMAGES.cylinderSphere,
       figLabel: 'GAMBAR 12A',
       options: [
-        { id: 'A', text: '160π cm³' },
-        { id: 'B', text: '140π cm³' },
-        { id: 'C', text: '180π cm³' },
-        { id: 'D', text: '200π cm³' }
+        { id: 'A', text: '$160\\pi\\text{ cm}^3$' },
+        { id: 'B', text: '$140\\pi\\text{ cm}^3$' },
+        { id: 'C', text: '$180\\pi\\text{ cm}^3$' },
+        { id: 'D', text: '$200\\pi\\text{ cm}^3$' }
       ],
       correctOption: 'B'
     };
@@ -173,13 +218,13 @@ export const MOCK_QUESTIONS: Question[] = Array.from({ length: 30 }).map((_, idx
   return {
     id: num,
     code: num % 2 === 0 ? 'ALJABAR • OPTIMA 2026' : 'TEORI BILANGAN • MATRIX',
-    text: `Soal ${num}: Hitunglah nilai dari ekspresi polinomial P(x) = x^${(num % 5) + 2} + ${num}x - ${(num * 3) % 17} ketika x = 3.`,
+    text: `Soal ${num}: Hitunglah nilai dari ekspresi polinomial $P(x) = x^${(num % 5) + 2} + ${num}x - ${(num * 3) % 17}$ ketika $x = 3$.`,
     note: 'Pilih jawaban yang menyatakan nilai tepat.',
     options: [
-      { id: 'A', text: `${num * 12 + 5}` },
-      { id: 'B', text: `${num * 14 - 2}` },
-      { id: 'C', text: `${num * 10 + 15}` },
-      { id: 'D', text: `${num * 16 - 8}` }
+      { id: 'A', text: `$${num * 12 + 5}$` },
+      { id: 'B', text: `$${num * 14 - 2}$` },
+      { id: 'C', text: `$${num * 10 + 15}$` },
+      { id: 'D', text: `$${num * 16 - 8}$` }
     ],
     correctOption: 'A'
   };

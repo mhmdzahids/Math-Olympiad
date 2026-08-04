@@ -46,6 +46,9 @@ export interface Participant {
   tabSwitches: number;
   status: 'qualified' | 'disqualified' | 'pending';
   category: 'SD-SMP' | 'SMA';
+  has_session?: boolean;
+  round_name?: string | null;
+  round_id?: string | null;
 }
 
 export interface ParsedQuestion {

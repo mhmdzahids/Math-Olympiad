@@ -208,6 +208,42 @@ class ApiService {
     }
   }
 
+  async getLeaderboard(category?: string, roundId?: string): Promise<any[]> {
+    const params = new URLSearchParams();
+    if (category) params.set('category', category);
+    if (roundId) params.set('round_id', roundId);
+    const qs = params.toString();
+    const url = `${API_BASE_URL}/rounds/leaderboard/all${qs ? '?' + qs : ''}`;
+    const res = await fetch(url, {
+      headers: this.getAuthHeaders(),
+    });
+    if (!res.ok) throw new Error('Gagal mengambil data klasemen dari database.');
+    return res.json();
+  }
+
+  async updateQualification(
+    participantId: string,
+    status: 'qualified' | 'disqualified' | 'pending',
+    category?: string
+  ): Promise<{ message: string; status: string }> {
+    const res = await fetch(`${API_BASE_URL}/rounds/qualification/update`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({
+        participant_id: participantId,
+        status,
+        category,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Gagal menyimpan status kualifikasi ke database.');
+    }
+
+    return res.json();
+  }
+
   // ---------- Questions API ----------
 
   async getRoundQuestions(roundId: string): Promise<QuestionData[]> {

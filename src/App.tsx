@@ -10,6 +10,7 @@ import { AdminRoundManagerView } from './components/AdminRoundManagerView';
 import { AdminLeaderboardView } from './components/AdminLeaderboardView';
 import { Footer } from './components/Footer';
 import { apiService, UserOut } from './services/api';
+import { ToastContainer, ToastMessage } from './components/Toast';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<ScreenView>('landing');
@@ -26,6 +27,17 @@ export default function App() {
   const [authEmail, setAuthEmail] = useState('');
   const [authPass, setAuthPass] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
+
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  const showToast = (message: string, type: 'success' | 'info' | 'warning' = 'success', title?: string) => {
+    const id = `toast-${Date.now()}-${Math.random()}`;
+    setToasts((prev) => [...prev, { id, message, type, title }]);
+  };
+
+  const dismissToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
 
   const [pendingNav, setPendingNav] = useState<{ screen: ScreenView; tab?: 'register' | 'login' } | null>(null);
 
@@ -320,16 +332,20 @@ export default function App() {
             highlightSaveTrigger={highlightSaveTrigger}
             selectedRoundTitle={selectedRound}
             onSelectRound={setSelectedRound}
+            onShowToast={showToast}
           />
         )}
 
         {currentScreen === 'admin-leaderboard' && (
-          <AdminLeaderboardView onNavigate={handleNavigate} />
+          <AdminLeaderboardView onNavigate={handleNavigate} onShowToast={showToast} />
         )}
       </div>
 
       {/* Footer (hidden during quiz execution for concentration) */}
       {currentScreen !== 'quiz' && <Footer onNavigate={handleNavigate} />}
+
+      {/* Bubble Chat Toast Notifications Overlay (Bottom Right) */}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
 
       {/* Auth Modal Overlay */}
       {authModal && (
