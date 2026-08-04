@@ -3,6 +3,7 @@ import { ScreenView, Question, CompetitionRound } from '../types';
 import { MOCK_QUESTIONS, ASSET_IMAGES } from '../data/mockData';
 import { apiService } from '../services/api';
 import { MathText } from './MathText';
+import { QuizTutorialModal } from './QuizTutorialModal';
 
 interface QuizExecutionViewProps {
   onNavigate: (screen: ScreenView) => void;
@@ -30,6 +31,7 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
   const [timeLeft, setTimeLeft] = useState<number>(durationMins * 60);
   const [tabSwitches, setTabSwitches] = useState<number>(0);
   const [showAntiCheatModal, setShowAntiCheatModal] = useState<boolean>(false);
+  const [showTutorialModal, setShowTutorialModal] = useState<boolean>(true);
   const [lastActivityLog, setLastActivityLog] = useState<string>('');
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
 
@@ -119,7 +121,7 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
 
   // Timer Countdown effect
   useEffect(() => {
-    if (isSubmitted || loadingQuestions) return;
+    if (isSubmitted || loadingQuestions || showTutorialModal) return;
     const interval = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
@@ -135,11 +137,11 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [isSubmitted, loadingQuestions, activeRound, userAnswers]);
+  }, [isSubmitted, loadingQuestions, showTutorialModal, activeRound, userAnswers]);
 
   // Tab switch & Window Focus Mode Listener with Server Log (Debounced)
   useEffect(() => {
-    if (isSubmitted || loadingQuestions) return;
+    if (isSubmitted || loadingQuestions || showTutorialModal) return;
 
     const handleBlur = async () => {
       const now = Date.now();
@@ -188,7 +190,7 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
       window.removeEventListener('blur', handleBlur);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [isSubmitted, loadingQuestions, maxSwitches, activeRound]);
+  }, [isSubmitted, loadingQuestions, showTutorialModal, maxSwitches, activeRound]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -529,6 +531,15 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Interactive Walkthrough Tutorial Modal Before Quiz Timer Starts */}
+      <QuizTutorialModal
+        isOpen={showTutorialModal}
+        onComplete={() => setShowTutorialModal(false)}
+        activeRoundTitle={activeRound?.title || 'Babak Penyisihan 1 (SD)'}
+        durationMinutes={durationMins}
+        maxSwitches={maxSwitches}
+      />
     </div>
   );
 };
