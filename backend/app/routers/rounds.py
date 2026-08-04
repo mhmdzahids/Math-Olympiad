@@ -22,7 +22,8 @@ from app.schemas import (
     ImportQuestionsRequest,
     QuizSessionStartOut,
 )
-from app.security import require_admin, get_current_user
+import random
+from app.security import require_admin, get_current_user, get_current_user_optional
 
 router = APIRouter(prefix="/rounds", tags=["Rounds & Questions"])
 
@@ -219,6 +220,7 @@ def create_round(
         question_count=round_in.question_count or 25,
         tab_switch_limit=round_in.tab_switch_limit,
         order_index=round_in.order_index or 1,
+        is_randomized=round_in.is_randomized if round_in.is_randomized is not None else True,
         start_date=round_in.start_date,
         start_time=round_in.start_time,
         end_date=round_in.end_date,
@@ -363,7 +365,8 @@ def import_questions_to_round(
 @router.get("/{round_id}/questions/student", response_model=List[QuestionStudentOut])
 def get_round_questions_for_student(
     round_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """[Peserta] Mendapatkan daftar soal untuk pengerjaan kuis TANPA kunci jawaban (Anti-Cheat)."""
     target_round = db.query(Round).filter(Round.id == round_id).first()
@@ -374,6 +377,20 @@ def get_round_questions_for_student(
         )
 
     questions = db.query(Question).filter(Question.round_id == round_id).order_by(Question.created_at).all()
+
+    # If student is logged in and has an active QuizSession with randomized question_order
+    if current_user:
+        participant = db.query(Participant).filter(Participant.user_id == current_user.id).first()
+        participant_id = participant.id if participant else current_user.id
+        session = db.query(QuizSession).filter(
+            QuizSession.participant_id == participant_id,
+            QuizSession.round_id == round_id
+        ).first()
+
+        if session and session.question_order:
+            order_map = {q_id: idx for idx, q_id in enumerate(session.question_order)}
+            questions.sort(key=lambda q: order_map.get(q.id, 9999))
+
     out = [
         QuestionStudentOut(
             id=q.id,
@@ -417,13 +434,21 @@ def start_quiz_session(
     if not session:
         duration_sec = target_round.duration_minutes * 60
         ends_at = now + timedelta(seconds=duration_sec)
+
+        # FR-A10: Shuffle question order per student session if is_randomized is enabled
+        all_q_objs = db.query(Question.id).filter(Question.round_id == round_id).order_by(Question.created_at).all()
+        q_order = [q.id for q in all_q_objs]
+        if target_round.is_randomized and q_order:
+            random.shuffle(q_order)
+
         session = QuizSession(
             participant_id=participant_id,
             round_id=round_id,
             started_at=now,
             ends_at=ends_at,
             status=SessionStatus.in_progress,
-            tab_switch_count=0
+            tab_switch_count=0,
+            question_order=q_order if q_order else None
         )
         db.add(session)
         db.commit()

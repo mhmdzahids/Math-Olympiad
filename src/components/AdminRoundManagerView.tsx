@@ -205,6 +205,7 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
           duration_minutes: r.durationMinutes,
           question_count: r.questionCount,
           tab_switch_limit: r.tabSwitchLimit,
+          is_randomized: r.isRandomized ?? true,
           is_offline_started: r.isOfflineStarted,
           start_date: r.startDate,
           start_time: r.startTime,
@@ -219,6 +220,7 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
             mode: r.executionMode,
             duration_minutes: r.durationMinutes,
             tab_switch_limit: r.tabSwitchLimit,
+            is_randomized: r.isRandomized ?? true,
             start_date: r.startDate,
             start_time: r.startTime,
             end_date: r.endDate,
@@ -314,6 +316,14 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
     ensureEditMode();
     const updated = currentRounds.map((r) =>
       r.id === roundId ? { ...r, questionCount: count } : r
+    );
+    updateRounds(updated);
+  };
+
+  const handleToggleRandomize = (roundId: string) => {
+    ensureEditMode();
+    const updated = currentRounds.map((r) =>
+      r.id === roundId ? { ...r, isRandomized: !(r.isRandomized ?? true) } : r
     );
     updateRounds(updated);
   };
@@ -1291,13 +1301,18 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                       </span>
                       <button
                         type="button"
-                        onClick={() => setRandomizeOrder(!randomizeOrder)}
-                        className={`w-12 h-6 rounded-full relative flex items-center px-1 transition-colors ${randomizeOrder ? 'bg-[#0a0a0a]' : 'bg-[#c4c7c7]'
-                          }`}
+                        onClick={() => {
+                          handleToggleRandomize(expandedRoundId);
+                          setRandomizeOrder(!randomizeOrder);
+                        }}
+                        className={`w-12 h-6 rounded-full relative flex items-center px-1 transition-colors ${
+                          (currentRounds.find(r => r.id === expandedRoundId)?.isRandomized ?? randomizeOrder) ? 'bg-[#0a0a0a]' : 'bg-[#c4c7c7]'
+                        }`}
                       >
                         <div
-                          className={`w-4 h-4 bg-white rounded-full transition-transform ${randomizeOrder ? 'translate-x-6' : 'translate-x-0'
-                            }`}
+                          className={`w-4 h-4 bg-white rounded-full transition-transform ${
+                            (currentRounds.find(r => r.id === expandedRoundId)?.isRandomized ?? randomizeOrder) ? 'translate-x-6' : 'translate-x-0'
+                          }`}
                         />
                       </button>
                     </div>

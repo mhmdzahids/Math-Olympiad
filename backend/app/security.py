@@ -71,3 +71,23 @@ def require_admin(user: User = Depends(get_current_user)) -> User:
             detail="Hanya admin yang boleh mengakses endpoint ini.",
         )
     return user
+
+
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
+
+
+def get_current_user_optional(
+    token: str = Depends(oauth2_scheme_optional), db: Session = Depends(get_db)
+):
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(
+            token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
+        )
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            return None
+        return db.query(User).filter(User.id == user_id).first()
+    except JWTError:
+        return None

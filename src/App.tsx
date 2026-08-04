@@ -73,6 +73,7 @@ export default function App() {
             questionCount: r.question_count ?? (r.category === 'sma' ? 30 : 25),
             durationMinutes: r.duration_minutes,
             tabSwitchLimit: r.tab_switch_limit,
+            isRandomized: r.is_randomized ?? true,
             status: r.status === 'draft' ? 'upcoming' : r.status === 'aktif' ? 'active' : 'completed',
             executionMode: r.mode,
             isOfflineStarted: r.is_offline_started,

@@ -71,6 +71,7 @@ class RoundCreate(BaseModel):
     question_count: Optional[int] = 25
     tab_switch_limit: Optional[int] = 3
     order_index: Optional[int] = 1
+    is_randomized: Optional[bool] = True
     start_date: Optional[str] = "2026-08-01"
     start_time: Optional[str] = "08:00"
     end_date: Optional[str] = "2026-08-10"
@@ -86,6 +87,7 @@ class RoundUpdate(BaseModel):
     question_count: Optional[int] = None
     tab_switch_limit: Optional[int] = None
     order_index: Optional[int] = None
+    is_randomized: Optional[bool] = None
     is_offline_started: Optional[bool] = None
     start_date: Optional[str] = None
     start_time: Optional[str] = None
@@ -103,6 +105,7 @@ class RoundOut(BaseModel):
     question_count: int
     tab_switch_limit: int
     order_index: int
+    is_randomized: bool = True
     is_offline_started: bool
     start_date: Optional[str] = "2026-08-01"
     start_time: Optional[str] = "08:00"

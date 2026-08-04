@@ -118,6 +118,7 @@ class Round(Base):
     duration_minutes = Column(Integer, nullable=False)
     question_count = Column(Integer, nullable=False, default=25)
     tab_switch_limit = Column(Integer, nullable=False, default=3)
+    is_randomized = Column(Boolean, nullable=False, default=True)  # FR-A10: randomize order per student
     is_offline_started = Column(Boolean, nullable=False, default=False)
     start_date = Column(String, nullable=True, default="2026-08-01")
     start_time = Column(String, nullable=True, default="08:00")
@@ -173,6 +174,7 @@ class QuizSession(Base):
     tab_switch_count = Column(Integer, nullable=False, default=0)
     score = Column(Numeric, nullable=True)
     active_session_token = Column(String, nullable=True)  # cegah multi-tab/device
+    question_order = Column(JSON, nullable=True)  # Array of question IDs e.g. ["uuid1", "uuid3", "uuid2"]
 
     __table_args__ = (
         UniqueConstraint("participant_id", "round_id", name="uq_session_participant_round"),

@@ -45,6 +45,7 @@ export interface RoundData {
   question_count?: number;
   tab_switch_limit: number;
   order_index: number;
+  is_randomized?: boolean;
   is_offline_started: boolean;
   start_date?: string;
   start_time?: string;
@@ -167,6 +168,7 @@ class ApiService {
     mode?: 'online' | 'offline';
     duration_minutes?: number;
     tab_switch_limit?: number;
+    is_randomized?: boolean;
     start_date?: string;
     start_time?: string;
     end_date?: string;

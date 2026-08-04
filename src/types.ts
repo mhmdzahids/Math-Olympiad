@@ -29,6 +29,7 @@ export interface CompetitionRound {
   tabSwitchLimit: number;
   status: 'submitted' | 'active' | 'locked' | 'draft' | 'upcoming' | 'completed';
   isFinal?: boolean;
+  isRandomized?: boolean;
   executionMode?: 'online' | 'offline';
   startDate?: string;
   startTime?: string;
