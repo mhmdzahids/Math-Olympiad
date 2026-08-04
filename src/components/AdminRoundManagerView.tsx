@@ -47,9 +47,22 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
   const [isSaveHighlighted, setIsSaveHighlighted] = useState<boolean>(false);
   const [dbQuestionsCount, setDbQuestionsCount] = useState<number>(0);
   const [isLoadingDbQuestions, setIsLoadingDbQuestions] = useState<boolean>(false);
-  const [showImportOptionsModal, setShowImportOptionsModal] = useState<boolean>(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [showImportOptionsModal, setShowImportOptionsModal] = useState<boolean>(false);
+  const [isLoadingPage, setIsLoadingPage] = useState<boolean>(true);
   const roundCardsContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const timer = setTimeout(() => {
+      if (isMounted) setIsLoadingPage(false);
+    }, 1200); // Constant 1.2-second realistic skeleton loader after login/navigation
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, []);
 
   // Load existing questions from DB when expanding a round
   useEffect(() => {
@@ -611,6 +624,48 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
       executeSaveToBank('replace');
     }
   };
+
+  if (isLoadingPage) {
+    return (
+      <div className="w-full bg-[#fef9ef] min-h-screen pb-32">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
+          {/* Header Banner Skeleton */}
+          <div className="bg-[#fffaf0] rounded-[32px] p-6 sm:p-8 border-2 border-[#0a0a0a]/10 clay-shadow-sm space-y-4 animate-pulse">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-2">
+                <div className="w-48 h-4 rounded-md bg-[#0a0a0a]/10" />
+                <div className="w-72 sm:w-96 h-8 rounded-2xl bg-[#0a0a0a]/15" />
+              </div>
+              <div className="w-36 h-11 rounded-2xl bg-[#0a0a0a]/15" />
+            </div>
+          </div>
+
+          {/* Category Tabs Skeleton */}
+          <div className="flex items-center gap-3">
+            <div className="w-28 h-11 rounded-2xl bg-[#0a0a0a]/10 animate-pulse" />
+            <div className="w-28 h-11 rounded-2xl bg-[#0a0a0a]/10 animate-pulse" />
+            <div className="w-28 h-11 rounded-2xl bg-[#0a0a0a]/10 animate-pulse" />
+          </div>
+
+          {/* Round Cards Skeleton */}
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="bg-white rounded-[24px] p-5 border-2 border-[#0a0a0a]/10 clay-shadow-sm animate-pulse flex items-center justify-between"
+              >
+                <div className="space-y-2">
+                  <div className="w-56 h-6 rounded-lg bg-[#0a0a0a]/15" />
+                  <div className="w-36 h-4 rounded-md bg-[#0a0a0a]/10" />
+                </div>
+                <div className="w-10 h-10 rounded-2xl bg-[#0a0a0a]/10" />
+              </div>
+            ))}
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full bg-[#fffaf0] min-h-screen pb-32">

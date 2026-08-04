@@ -21,6 +21,19 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   const normalizedCategory = studentCategory.includes('SD') ? 'SD' : studentCategory.includes('SMP') ? 'SMP' : 'SMA';
   const [selectedCategory, setSelectedCategory] = useState<'SD' | 'SMP' | 'SMA'>(normalizedCategory as 'SD' | 'SMP' | 'SMA');
   const [myQuizSessionsList, setMyQuizSessionsList] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    const timer = setTimeout(() => {
+      if (isMounted) setIsLoading(false);
+    }, 1200); // Constant 1.2-second realistic skeleton loader after login
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, []);
 
   useEffect(() => {
     const norm = studentCategory.includes('SD') ? 'SD' : studentCategory.includes('SMP') ? 'SMP' : 'SMA';
@@ -75,6 +88,61 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   }
 
   const displayedRounds = rounds.filter((r) => (r.category || 'SD') === selectedCategory);
+
+  if (isLoading) {
+    return (
+      <div className="w-full bg-[#fef9ef] min-h-screen pb-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 lg:pt-10 space-y-10">
+          {/* Welcome Banner Skeleton */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-pulse">
+            <div className="space-y-3">
+              <div className="w-48 h-4 rounded-md bg-[#0a0a0a]/10" />
+              <div className="w-72 sm:w-96 h-10 rounded-2xl bg-[#0a0a0a]/15" />
+              <div className="w-64 sm:w-80 h-4 rounded-md bg-[#0a0a0a]/10" />
+            </div>
+            <div className="w-36 h-11 rounded-2xl bg-[#0a0a0a]/10" />
+          </div>
+
+          {/* Category Filter Pills Skeleton */}
+          <div className="flex items-center gap-3 pt-2">
+            <div className="w-24 h-11 rounded-2xl bg-[#0a0a0a]/10 animate-pulse" />
+            <div className="w-24 h-11 rounded-2xl bg-[#0a0a0a]/10 animate-pulse" />
+            <div className="w-24 h-11 rounded-2xl bg-[#0a0a0a]/10 animate-pulse" />
+          </div>
+
+          {/* Exam Guidelines Banner Skeleton */}
+          <div className="bg-[#fffaf0] rounded-[32px] p-6 sm:p-8 border-2 border-[#0a0a0a]/10 clay-shadow-sm space-y-4 animate-pulse">
+            <div className="w-40 h-5 rounded-md bg-[#0a0a0a]/10" />
+            <div className="w-3/4 h-8 rounded-xl bg-[#0a0a0a]/15" />
+            <div className="w-2/3 h-4 rounded-md bg-[#0a0a0a]/10" />
+          </div>
+
+          {/* Active Round Cards Grid Skeleton */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="bg-white rounded-[28px] p-6 border-2 border-[#0a0a0a]/10 clay-shadow-sm space-y-5 animate-pulse"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="w-24 h-6 rounded-full bg-[#0a0a0a]/10" />
+                  <div className="w-20 h-6 rounded-full bg-[#0a0a0a]/10" />
+                </div>
+                <div className="space-y-2">
+                  <div className="w-3/4 h-7 rounded-xl bg-[#0a0a0a]/15" />
+                  <div className="w-1/2 h-4 rounded-md bg-[#0a0a0a]/10" />
+                </div>
+                <div className="pt-4 border-t border-[#0a0a0a]/5 flex items-center justify-between">
+                  <div className="w-28 h-5 rounded-md bg-[#0a0a0a]/10" />
+                  <div className="w-28 h-10 rounded-2xl bg-[#0a0a0a]/15" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full bg-[#fef9ef] min-h-screen pb-20">

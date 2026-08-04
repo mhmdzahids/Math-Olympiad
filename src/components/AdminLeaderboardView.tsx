@@ -353,10 +353,10 @@ export const AdminLeaderboardView: React.FC<AdminLeaderboardViewProps> = ({ onNa
     }
   };
 
-  // Fetch leaderboard data dengan minimum delay konstan agar skeleton terasa realistis
+  // Fetch leaderboard data dengan minimum delay konstan agar skeleton terasa realistis setelah login/navigasi
   const fetchLeaderboard = async () => {
     setIsLoading(true);
-    const minDelay = new Promise((resolve) => setTimeout(resolve, 500));
+    const minDelay = new Promise((resolve) => setTimeout(resolve, 1200));
     try {
       const [data] = await Promise.all([
         apiService.getLeaderboard(selectedCategory.toLowerCase(), selectedRoundId ?? undefined),
