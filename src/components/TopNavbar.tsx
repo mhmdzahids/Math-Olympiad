@@ -31,7 +31,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
 }) => {
   const [roundDropdownOpen, setRoundDropdownOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
-  const [activeCategoryHover, setActiveCategoryHover] = useState<'SD-SMP' | 'SMA' | null>('SD-SMP');
+  const [activeCategoryHover, setActiveCategoryHover] = useState<'SD' | 'SMP' | 'SMA' | null>(null);
   const [activeSection, setActiveSection] = useState<'schedule' | 'categories' | 'rules' | null>(null);
 
   useEffect(() => {
@@ -40,6 +40,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
       if (!target.closest('.relative')) {
         setRoundDropdownOpen(false);
         setProfileDropdownOpen(false);
+        setActiveCategoryHover(null);
       }
     };
     document.addEventListener('click', handleClickOutside);
@@ -117,16 +118,24 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
             />
           </button>
 
-          {variant === 'admin' && (
-            <>
-              <div className="h-6 w-[1px] bg-[#c4c7c7] hidden sm:block" />
-              <div className="relative">
+          {/* Smooth Sliding Dropdown Container */}
+          <div
+            className={`flex items-center transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${
+              currentScreen === 'admin-rounds'
+                ? 'max-w-[320px] opacity-100 scale-100 pointer-events-auto overflow-visible'
+                : 'max-w-0 opacity-0 scale-95 pointer-events-none overflow-hidden'
+            }`}
+          >
+            <div className="flex items-center py-1">
+              <div className="h-6 w-[1px] bg-[#c4c7c7] hidden sm:block mr-3 sm:mr-6 shrink-0" />
+              <div className="relative shrink-0 whitespace-nowrap">
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setRoundDropdownOpen(!roundDropdownOpen);
                     setProfileDropdownOpen(false);
-                    if (!roundDropdownOpen) setActiveCategoryHover('SD-SMP');
+                    setActiveCategoryHover(null);
                   }}
                   className="flex items-center gap-1.5 bg-[#f5f0e0] border border-[#0a0a0a]/10 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold text-[#0a0a0a] hover:bg-[#ebe6d6] transition-all shadow-2xs cursor-pointer"
                 >
@@ -135,26 +144,42 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
                   <span className="material-symbols-outlined text-[18px]">expand_more</span>
                 </button>
 
-                {roundDropdownOpen && (
-                  <div className="absolute left-0 mt-2 flex flex-col sm:flex-row gap-1 z-50 animate-in fade-in zoom-in-95 duration-150">
+                {roundDropdownOpen && currentScreen === 'admin-rounds' && (
+                  <div className="absolute left-0 mt-2 flex flex-col sm:flex-row items-start gap-1 z-50 animate-in fade-in zoom-in-95 duration-150">
                     {/* Main Categories Menu */}
-                    <div className="w-56 bg-white rounded-2xl shadow-2xl border border-[#0a0a0a]/10 p-2 space-y-1">
+                    <div className="w-56 bg-white rounded-2xl shadow-2xl border border-[#0a0a0a]/10 p-2 space-y-1 self-start h-fit">
                       <div className="px-3 py-1.5 text-[10px] font-black uppercase text-[#6a6a6a] tracking-wider border-b border-[#0a0a0a]/5 mb-1">
                         Kategori Lomba
                       </div>
 
-                      {/* SD-SMP Category Item */}
+                      {/* SD Category Item */}
                       <div
-                        onMouseEnter={() => setActiveCategoryHover('SD-SMP')}
-                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
-                          activeCategoryHover === 'SD-SMP'
-                            ? 'bg-[#a4d4c5] text-[#0a0a0a] shadow-2xs'
+                        onMouseEnter={() => setActiveCategoryHover('SD')}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                          activeCategoryHover === 'SD'
+                            ? 'bg-[#ffb084] text-[#0a0a0a] shadow-2xs'
                             : 'hover:bg-[#f8f3e9] text-[#0a0a0a]'
                         }`}
                       >
                         <div className="flex items-center gap-2">
                           <span className="material-symbols-outlined text-base">child_care</span>
-                          <span>SD - SMP</span>
+                          <span>SD / MI</span>
+                        </div>
+                        <span className="material-symbols-outlined text-base">chevron_right</span>
+                      </div>
+
+                      {/* SMP Category Item */}
+                      <div
+                        onMouseEnter={() => setActiveCategoryHover('SMP')}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                          activeCategoryHover === 'SMP'
+                            ? 'bg-[#b8a4ed] text-[#0a0a0a] shadow-2xs'
+                            : 'hover:bg-[#f8f3e9] text-[#0a0a0a]'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="material-symbols-outlined text-base">school</span>
+                          <span>SMP / MTs</span>
                         </div>
                         <span className="material-symbols-outlined text-base">chevron_right</span>
                       </div>
@@ -162,15 +187,15 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
                       {/* SMA Category Item */}
                       <div
                         onMouseEnter={() => setActiveCategoryHover('SMA')}
-                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
                           activeCategoryHover === 'SMA'
-                            ? 'bg-[#b8a4ed] text-[#0a0a0a] shadow-2xs'
+                            ? 'bg-[#e8b94a] text-[#0a0a0a] shadow-2xs'
                             : 'hover:bg-[#f8f3e9] text-[#0a0a0a]'
                         }`}
                       >
                         <div className="flex items-center gap-2">
                           <span className="material-symbols-outlined text-base">workspace_premium</span>
-                          <span>SMA</span>
+                          <span>SMA / SMK / MA</span>
                         </div>
                         <span className="material-symbols-outlined text-base">chevron_right</span>
                       </div>
@@ -198,6 +223,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
                                   onClick={() => {
                                     if (onSelectRound) onSelectRound(r.title);
                                     setRoundDropdownOpen(false);
+                                    setActiveCategoryHover(null);
                                   }}
                                   className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-start gap-2 cursor-pointer ${
                                     isSelected
@@ -225,8 +251,8 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
                   </div>
                 )}
               </div>
-            </>
-          )}
+            </div>
+          </div>
         </div>
 
         {/* Center Section: Navigation Links */}
@@ -256,6 +282,21 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
             </>
           ) : (
             <>
+              {currentScreen === 'student-dashboard' && (
+                <button
+                  onClick={() => {
+                    setActiveSection(null);
+                    onNavigate('student-dashboard');
+                  }}
+                  className={`font-semibold text-sm transition-all pb-0.5 cursor-pointer ${
+                    currentScreen === 'student-dashboard' && activeSection === null
+                      ? 'text-[#0a0a0a] border-b-2 border-[#0a0a0a]'
+                      : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
+                  }`}
+                >
+                  Dashboard
+                </button>
+              )}
               <button
                 onClick={() => {
                   setActiveSection('schedule');
@@ -270,7 +311,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
                     }, 100);
                   }
                 }}
-                className={`font-semibold text-sm transition-all pb-0.5 ${
+                className={`font-semibold text-sm transition-all pb-0.5 cursor-pointer ${
                   currentScreen === 'landing' && activeSection === 'schedule'
                     ? 'text-[#0a0a0a] border-b-2 border-[#0a0a0a]'
                     : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
@@ -389,6 +430,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
                   <button
                     onClick={() => {
                       setProfileDropdownOpen(false);
+                      if (onLogout) onLogout();
                       onNavigate('landing');
                     }}
                     className="w-full text-left px-4 py-2 text-xs font-bold text-[#ff6b5a] hover:bg-[#ff6b5a]/10 flex items-center gap-2 transition-colors"

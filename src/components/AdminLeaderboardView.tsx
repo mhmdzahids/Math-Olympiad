@@ -9,7 +9,7 @@ interface AdminLeaderboardViewProps {
 export const AdminLeaderboardView: React.FC<AdminLeaderboardViewProps> = ({
   onNavigate
 }) => {
-  const [selectedCategory, setSelectedCategory] = useState<'SD-SMP' | 'SMA'>('SD-SMP');
+  const [selectedCategory, setSelectedCategory] = useState<'SD' | 'SMP' | 'SMA'>('SD');
   const [participants, setParticipants] = useState<Participant[]>(INITIAL_PARTICIPANTS);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
@@ -34,7 +34,7 @@ export const AdminLeaderboardView: React.FC<AdminLeaderboardViewProps> = ({
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Penyisihan2_Leaderboard_${selectedCategory}.csv`);
+    link.setAttribute('download', `Penyisihan_Leaderboard_${selectedCategory}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -66,30 +66,41 @@ export const AdminLeaderboardView: React.FC<AdminLeaderboardViewProps> = ({
         <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 relative">
           <div className="space-y-4 max-w-3xl">
             <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-[#0a0a0a] leading-tight">
-              Kualifikasi & Klasemen - Penyisihan 2
+              Kualifikasi &amp; Klasemen - Penyisihan OPTIMA
             </h1>
 
-            <div className="flex gap-2">
+            <div className="flex gap-2 py-2 px-1 overflow-x-auto">
               <button
-                onClick={() => setSelectedCategory('SD-SMP')}
-                className={`px-6 py-1.5 rounded-full font-bold text-xs sm:text-sm transition-all ${
-                  selectedCategory === 'SD-SMP'
-                    ? 'bg-[#a4d4c5] text-[#0a0a0a] ring-2 ring-[#a4d4c5] ring-offset-2'
-                    : 'bg-[#ebe6d6] text-[#6a6a6a] hover:bg-[#b8a4ed] hover:text-[#0a0a0a]'
+                onClick={() => setSelectedCategory('SD')}
+                className={`px-5 py-1.5 rounded-full font-bold text-xs sm:text-sm transition-all ${
+                  selectedCategory === 'SD'
+                    ? 'bg-[#ffb084] text-[#0a0a0a] ring-2 ring-[#ffb084] ring-offset-2 ring-offset-[#fef9ef]'
+                    : 'bg-[#ebe6d6] text-[#6a6a6a] hover:bg-[#ffb084]/40 hover:text-[#0a0a0a]'
                 }`}
               >
-                SD-SMP
+                SD / MI
+              </button>
+
+              <button
+                onClick={() => setSelectedCategory('SMP')}
+                className={`px-5 py-1.5 rounded-full font-bold text-xs sm:text-sm transition-all ${
+                  selectedCategory === 'SMP'
+                    ? 'bg-[#b8a4ed] text-[#0a0a0a] ring-2 ring-[#b8a4ed] ring-offset-2 ring-offset-[#fef9ef]'
+                    : 'bg-[#ebe6d6] text-[#6a6a6a] hover:bg-[#b8a4ed]/40 hover:text-[#0a0a0a]'
+                }`}
+              >
+                SMP / MTs
               </button>
 
               <button
                 onClick={() => setSelectedCategory('SMA')}
-                className={`px-6 py-1.5 rounded-full font-bold text-xs sm:text-sm transition-all ${
+                className={`px-5 py-1.5 rounded-full font-bold text-xs sm:text-sm transition-all ${
                   selectedCategory === 'SMA'
-                    ? 'bg-[#a4d4c5] text-[#0a0a0a] ring-2 ring-[#a4d4c5] ring-offset-2'
-                    : 'bg-[#ebe6d6] text-[#6a6a6a] hover:bg-[#b8a4ed] hover:text-[#0a0a0a]'
+                    ? 'bg-[#e8b94a] text-[#0a0a0a] ring-2 ring-[#e8b94a] ring-offset-2 ring-offset-[#fef9ef]'
+                    : 'bg-[#ebe6d6] text-[#6a6a6a] hover:bg-[#e8b94a]/40 hover:text-[#0a0a0a]'
                 }`}
               >
-                SMA
+                SMA / SMK / MA
               </button>
             </div>
           </div>

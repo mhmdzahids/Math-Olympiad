@@ -1,29 +1,67 @@
 import React, { useState, useEffect } from 'react';
 import { ScreenView, CompetitionRound } from '../types';
-import { ASSET_IMAGES, INITIAL_ROUNDS } from '../data/mockData';
+import { ASSET_IMAGES, INITIAL_ROUNDS, COMPETITION_INFO } from '../data/mockData';
+import { apiService } from '../services/api';
 
 interface StudentDashboardProps {
   onNavigate: (screen: ScreenView) => void;
   studentName?: string;
   studentCategory?: string;
   rounds?: CompetitionRound[];
+  onStartQuiz?: (round: CompetitionRound) => void;
 }
 
 export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   onNavigate,
   studentName = 'Andi',
   studentCategory = 'SMA',
-  rounds = INITIAL_ROUNDS
+  rounds = INITIAL_ROUNDS,
+  onStartQuiz
 }) => {
-  const normalizedCategory = studentCategory.includes('SD') || studentCategory.includes('SMP') ? 'SD-SMP' : 'SMA';
-  const [selectedCategory, setSelectedCategory] = useState<'SD-SMP' | 'SMA'>(normalizedCategory as 'SD-SMP' | 'SMA');
+  const normalizedCategory = studentCategory.includes('SD') ? 'SD' : studentCategory.includes('SMP') ? 'SMP' : 'SMA';
+  const [selectedCategory, setSelectedCategory] = useState<'SD' | 'SMP' | 'SMA'>(normalizedCategory as 'SD' | 'SMP' | 'SMA');
+  const [myQuizSessionsList, setMyQuizSessionsList] = useState<any[]>([]);
 
   useEffect(() => {
-    const norm = studentCategory.includes('SD') || studentCategory.includes('SMP') ? 'SD-SMP' : 'SMA';
-    setSelectedCategory(norm as 'SD-SMP' | 'SMA');
+    const norm = studentCategory.includes('SD') ? 'SD' : studentCategory.includes('SMP') ? 'SMP' : 'SMA';
+    setSelectedCategory(norm as 'SD' | 'SMP' | 'SMA');
   }, [studentCategory]);
 
-  const displayedRounds = rounds.filter((r) => (r.category || 'SMA') === selectedCategory);
+  useEffect(() => {
+    let isMounted = true;
+    async function loadMySessions() {
+      try {
+        const list = await apiService.getMyQuizSessions();
+        if (!isMounted) return;
+        setMyQuizSessionsList(list || []);
+      } catch {
+        // Fallback if unauthenticated / offline
+      }
+    }
+    loadMySessions();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  function getRoundScheduleInfo(round: CompetitionRound) {
+    const sDate = round.startDate || '2026-08-01';
+    const sTime = round.startTime || '08:00';
+    const eDate = round.endDate || '2026-08-10';
+    const eTime = round.endTime || '18:00';
+
+    const startDt = new Date(`${sDate}T${sTime}:00`);
+    const endDt = new Date(`${eDate}T${eTime}:00`);
+    const now = new Date();
+
+    const isBefore = now < startDt;
+    const isAfter = now > endDt;
+    const isOpen = !isBefore && !isAfter;
+
+    return { isBefore, isAfter, isOpen, sDate, sTime, eDate, eTime };
+  }
+
+  const displayedRounds = rounds.filter((r) => (r.category || 'SD') === selectedCategory);
 
   return (
     <div className="w-full bg-[#fef9ef] min-h-screen pb-20">
@@ -31,11 +69,14 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
         {/* Welcome Banner */}
         <div className="mb-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
+            <span className="text-xs font-black uppercase text-[#ff6b5a] tracking-wider block mb-1">
+              OPTIMA MATRIX 2026 • PORTAL PESERTA
+            </span>
             <h1 className="text-3xl sm:text-5xl font-bold text-[#0a0a0a] tracking-tight mb-2">
               Selamat datang kembali, {studentName}!
             </h1>
             <p className="text-base text-[#6a6a6a] max-w-2xl">
-              Siap menghadapi tantangan berikutnya? Progres Anda sedang dicatat menuju kejuaraan nasional.
+              Siapkan diri Anda untuk mengikuti rangkaian babak Olimpiade Prestasi Matematika 2026 Se-Pulau Jawa.
             </p>
           </div>
 
@@ -53,45 +94,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
           <div className="lg:col-span-8 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
               <h2 className="text-xl sm:text-2xl font-extrabold text-[#0a0a0a] tracking-tight">
-                Babak Kompetisi
+                Babak Kompetisi OPTIMA 2026
               </h2>
-
-              {/* Category Filter Tabs */}
-              <div className="flex items-center gap-1.5 bg-[#ebe6d6] p-1.5 rounded-2xl border border-[#0a0a0a]/10">
-                <button
-                  type="button"
-                  onClick={() => setSelectedCategory('SD-SMP')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
-                    selectedCategory === 'SD-SMP'
-                      ? 'bg-[#ffb084] text-[#0a0a0a] shadow-2xs border border-[#0a0a0a]/20'
-                      : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
-                  }`}
-                >
-                  <span>SD - SMP</span>
-                  {normalizedCategory === 'SD-SMP' && (
-                    <span className="bg-[#0a0a0a] text-white text-[9px] px-1.5 py-0.2 rounded-full font-extrabold">
-                      Anda
-                    </span>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedCategory('SMA')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
-                    selectedCategory === 'SMA'
-                      ? 'bg-[#e8b94a] text-[#0a0a0a] shadow-2xs border border-[#0a0a0a]/20'
-                      : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
-                  }`}
-                >
-                  <span>SMA</span>
-                  {normalizedCategory === 'SMA' && (
-                    <span className="bg-[#0a0a0a] text-white text-[9px] px-1.5 py-0.2 rounded-full font-extrabold">
-                      Anda
-                    </span>
-                  )}
-                </button>
-              </div>
             </div>
 
             <div className="space-y-6">
@@ -103,199 +107,228 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                 </div>
               ) : (
                 displayedRounds.map((round, idx) => {
-                const isOffline = round.executionMode === 'offline';
+                  const isOffline = round.executionMode === 'offline';
+                  const session = myQuizSessionsList.find((s) => s.round_id === round.id);
+                  const { isBefore, isAfter, isOpen, sDate, sTime, eDate, eTime } = getRoundScheduleInfo(round);
 
-                if (round.status === 'submitted') {
+                  const isCompletedSession = Boolean(
+                    session && (
+                      session.status === 'completed' ||
+                      session.status === 'force_ended_tabswitch' ||
+                      session.status === 'force_ended_timeout' ||
+                      session.submitted_at
+                    )
+                  );
+
+                  const isOngoingSession = Boolean(
+                    session && session.status === 'in_progress' && session.remaining_seconds > 0
+                  );
+
+                  if (round.status === 'submitted' || isCompletedSession) {
+                    return (
+                      <div
+                        key={round.id}
+                        className="clay-card bg-[#f8f3e9] rounded-2xl p-6 flex flex-col md:flex-row items-start md:items-center gap-6 border border-[#e7e2d8]"
+                      >
+                        <div className="w-16 h-16 bg-[#e7e2d8] rounded-xl flex items-center justify-center relative shrink-0">
+                          <span className="material-symbols-outlined text-[#6a6a6a] text-4xl">
+                            check_circle
+                          </span>
+                          {idx === 0 && (
+                            <div className="absolute -top-6 -left-4 w-12 h-12 pointer-events-none">
+                              <img
+                                src={ASSET_IMAGES.starPeek}
+                                alt="Star Mascot"
+                                className="w-full h-full object-contain"
+                              />
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex-grow">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <h3 className="text-lg font-bold text-[#0a0a0a]">{round.title}</h3>
+                            <span className="bg-[#a4d4c5] text-[#0a0a0a] px-2.5 py-0.5 rounded-lg text-[11px] font-black uppercase">
+                              Selesai (1x Percobaan)
+                            </span>
+                            {isOffline && (
+                              <span className="bg-[#feaf83]/30 text-[#0a0a0a] px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase">
+                                Sesi Offline
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-[#6a6a6a]">
+                            Jawaban Anda telah tersimpan dan dinilai oleh server. Setiap peserta hanya berhak 1x kesempatan pengerjaan.
+                          </p>
+                        </div>
+
+                        <div className="text-left md:text-right shrink-0">
+                          <button
+                            type="button"
+                            disabled
+                            className="bg-[#0a0a0a]/10 text-[#6a6a6a] font-extrabold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 cursor-not-allowed border border-[#0a0a0a]/10"
+                          >
+                            <span className="material-symbols-outlined text-sm text-[#0a0a0a]/60">check_circle</span>
+                            <span>Quiz Sudah Selesai Dikerjakan</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  if (round.status === 'active') {
+                    return (
+                      <div
+                        key={round.id}
+                        className="clay-card bg-[#ffb084] text-[#0a0a0a] rounded-[28px] p-6 sm:p-8 flex flex-col gap-6 relative overflow-hidden border-2 border-[#0a0a0a] clay-shadow transition-transform hover:-translate-y-0.5"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-2xl bg-[#0a0a0a] text-white flex items-center justify-center font-black text-xl shrink-0 clay-shadow-sm">
+                              <span className="material-symbols-outlined text-2xl text-[#a4d4c5]">quiz</span>
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap mb-1">
+                                <span className="bg-[#0a0a0a] text-white text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider shadow-2xs">
+                                  BABAK AKTIF
+                                </span>
+                                {isOngoingSession && (
+                                  <span className="bg-[#ba1a1a] text-white text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider animate-pulse shadow-2xs">
+                                    SESI BERJALAN
+                                  </span>
+                                )}
+                                {isOffline ? (
+                                  <span className="bg-white/80 text-[#0a0a0a] text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full border border-[#0a0a0a]/20">
+                                    Sesi Offline Kampus UIN
+                                  </span>
+                                ) : (
+                                  <span className="bg-white/80 text-[#0a0a0a] text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full border border-[#0a0a0a]/20">
+                                    Zoom Daring
+                                  </span>
+                                )}
+                              </div>
+                              <h3 className="text-xl sm:text-2xl font-black text-[#0a0a0a] tracking-tight">{round.title}</h3>
+                            </div>
+                          </div>
+
+                          <div className="text-xs text-[#0a0a0a] font-extrabold bg-white/80 border border-[#0a0a0a]/20 px-3.5 py-1.5 rounded-xl shrink-0 self-start sm:self-auto shadow-2xs">
+                            {round.questionCount} Soal • {round.durationMinutes} Menit
+                          </div>
+                        </div>
+
+                        <p className="text-sm text-[#0a0a0a]/90 font-medium leading-relaxed max-w-2xl relative z-10">
+                          {isOffline
+                            ? 'Sesi final dilaksanakan tatap muka di Kampus UIN Siber Syekh Nurjati Cirebon.'
+                            : 'Ujian penyisihan daring via Zoom. Kamera pengawas wajib diatur posisi samping ±1 meter.'}
+                        </p>
+
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pt-4 border-t-2 border-[#0a0a0a]/15 relative z-10">
+                          <div className="text-xs text-[#0a0a0a]/80 font-bold">
+                            Jadwal Ujian: <strong className="text-[#0a0a0a] font-black">{sDate} ({sTime} WIB) s.d {eDate} ({eTime} WIB)</strong>
+                          </div>
+
+                          {!isOffline && (
+                            <>
+                              {isCompletedSession ? (
+                                <button
+                                  type="button"
+                                  disabled
+                                  className="w-full sm:w-auto bg-[#0a0a0a]/30 text-white/70 font-extrabold px-6 py-3.5 rounded-2xl text-xs sm:text-sm flex items-center justify-center gap-2 cursor-not-allowed border border-[#0a0a0a]/20"
+                                  title="Quiz sudah selesai dikerjakan"
+                                >
+                                  <span className="material-symbols-outlined text-sm text-[#a4d4c5]">check_circle</span>
+                                  <span>Quiz Sudah Selesai Dikerjakan</span>
+                                </button>
+                              ) : isOngoingSession ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (onStartQuiz) onStartQuiz(round);
+                                    else onNavigate('quiz');
+                                  }}
+                                  className="w-full sm:w-auto bg-[#0a0a0a] hover:bg-[#1a1a1a] text-[#a4d4c5] font-extrabold px-7 py-3.5 rounded-2xl clay-shadow clay-button-active transition-all text-sm flex items-center justify-center gap-2 cursor-pointer animate-pulse"
+                                >
+                                  <span>Lanjutkan Quiz</span>
+                                  <span className="material-symbols-outlined text-sm text-[#a4d4c5]">forward</span>
+                                </button>
+                              ) : isOpen ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (onStartQuiz) onStartQuiz(round);
+                                    else onNavigate('quiz');
+                                  }}
+                                  className="w-full sm:w-auto bg-[#0a0a0a] hover:bg-[#1a1a1a] text-white font-extrabold px-7 py-3.5 rounded-2xl clay-shadow clay-button-active transition-all text-sm flex items-center justify-center gap-2 cursor-pointer"
+                                >
+                                  <span>Mulai Quiz Sekarang</span>
+                                  <span className="material-symbols-outlined text-sm text-[#a4d4c5]">play_arrow</span>
+                                </button>
+                              ) : isBefore ? (
+                                <button
+                                  type="button"
+                                  disabled
+                                  className="w-full sm:w-auto bg-[#0a0a0a]/40 text-white/70 font-extrabold px-6 py-3.5 rounded-2xl text-xs sm:text-sm flex items-center justify-center gap-2 cursor-not-allowed border border-[#0a0a0a]/20"
+                                  title="Waktu ujian belum dimulai"
+                                >
+                                  <span className="material-symbols-outlined text-sm">lock_clock</span>
+                                  <span>Waktu Ujian Belum Dimulai</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  disabled
+                                  className="w-full sm:w-auto bg-[#0a0a0a]/40 text-white/70 font-extrabold px-6 py-3.5 rounded-2xl text-xs sm:text-sm flex items-center justify-center gap-2 cursor-not-allowed border border-[#0a0a0a]/20"
+                                  title="Waktu ujian telah berakhir"
+                                >
+                                  <span className="material-symbols-outlined text-sm">event_busy</span>
+                                  <span>Waktu Ujian Berakhir</span>
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // Locked Status
                   return (
                     <div
                       key={round.id}
-                      className="clay-card bg-[#f8f3e9] rounded-2xl p-6 flex flex-col md:flex-row items-start md:items-center gap-6 border border-[#e7e2d8]"
+                      className="clay-card bg-[#f5f0e0] rounded-2xl p-6 flex flex-col md:flex-row items-start md:items-center gap-6 border border-[#e7e2d8] opacity-75"
                     >
-                      <div className="w-16 h-16 bg-[#e7e2d8] rounded-xl flex items-center justify-center relative shrink-0">
+                      <div className="w-16 h-16 bg-[#e7e2d8] rounded-xl flex items-center justify-center shrink-0">
                         <span className="material-symbols-outlined text-[#6a6a6a] text-4xl">
-                          check_circle
+                          {isOffline ? 'co_present' : 'lock'}
                         </span>
-                        {/* 3D Mascot Peek */}
-                        {idx === 0 && (
-                          <div className="absolute -top-6 -left-4 w-12 h-12 pointer-events-none">
-                            <img
-                              src={ASSET_IMAGES.starPeek}
-                              alt="Star Mascot"
-                              className="w-full h-full object-contain"
-                            />
-                          </div>
-                        )}
                       </div>
 
                       <div className="flex-grow">
                         <div className="flex items-center gap-2 mb-1 flex-wrap">
                           <h3 className="text-lg font-bold text-[#0a0a0a]">{round.title}</h3>
-                          <span className="bg-[#ebe6d6] text-[#6a6a6a] px-2.5 py-0.5 rounded-lg text-[11px] font-bold uppercase">
-                            Selesai
+                          <span className="bg-[#e8b94a]/20 text-[#8c6508] px-2.5 py-0.5 rounded-lg text-[11px] font-bold uppercase">
+                            Terkunci
                           </span>
                           {isOffline && (
                             <span className="bg-[#feaf83]/30 text-[#0a0a0a] px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase">
-                              Sesi Offline
+                              Offline Kampus UIN SSC
                             </span>
                           )}
                         </div>
                         <p className="text-sm text-[#6a6a6a]">
-                          Selesai pada 12 Okt 2024. Hasil Anda sedang diverifikasi oleh panitia.
+                          Terbuka untuk 10 peserta terbaik yang lolos dari babak penyisihan.
                         </p>
                       </div>
 
-                      <div className="text-left md:text-right shrink-0">
-                        <span className="text-sm font-semibold text-[#6a6a6a]">Proses Penilaian</span>
+                      <div className="shrink-0">
+                        <span className="bg-[#f2ede4] px-3 py-1 rounded-md text-[10px] font-black text-[#6a6a6a]/60 border border-[#6a6a6a]/20">
+                          {round.isFinal ? 'BABAK FINAL' : 'PENYISIHAN'}
+                        </span>
                       </div>
                     </div>
                   );
-                }
-
-                if (round.status === 'active') {
-                  const startDateStr = round.startDate || '2026-08-01';
-                  const startTimeStr = round.startTime || '08:00';
-                  const endDateStr = round.endDate || '2026-08-10';
-                  const endTimeStr = round.endTime || '18:00';
-
-                  const startDateTime = new Date(`${startDateStr}T${startTimeStr}:00`);
-                  const endDateTime = new Date(`${endDateStr}T${endTimeStr}:00`);
-                  const now = new Date();
-
-                  const isNotStartedYet = now < startDateTime;
-                  const isClosed = now > endDateTime;
-                  const isWithinWindow = !isNotStartedYet && !isClosed;
-
-                  return (
-                    <div
-                      key={round.id}
-                      className="clay-card bg-[#ff4d8b] rounded-2xl p-6 sm:p-8 flex flex-col md:flex-row items-start md:items-center gap-6 shadow-xl shadow-[#ff4d8b]/20 relative overflow-hidden text-white"
-                    >
-                      <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full blur-3xl pointer-events-none" />
-
-                      <div className="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center relative z-10 shrink-0">
-                        <span className="material-symbols-outlined text-white text-4xl">
-                          {isOffline ? 'co_present' : isNotStartedYet ? 'event_upcoming' : isClosed ? 'event_busy' : 'schedule'}
-                        </span>
-                      </div>
-
-                      <div className="flex-grow relative z-10">
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <h3 className="text-xl font-extrabold text-white">{round.title}</h3>
-                          {isNotStartedYet ? (
-                            <span className="bg-amber-300 text-[#0a0a0a] px-2.5 py-0.5 rounded-lg text-[11px] font-black uppercase tracking-wide">
-                              Belum Dimulai
-                            </span>
-                          ) : isClosed ? (
-                            <span className="bg-gray-800 text-white px-2.5 py-0.5 rounded-lg text-[11px] font-bold uppercase">
-                              Sudah Ditutup
-                            </span>
-                          ) : (
-                            <span className="bg-white/20 text-white px-2.5 py-0.5 rounded-lg text-[11px] font-bold uppercase">
-                              Aktif & Tersedia
-                            </span>
-                          )}
-
-                          {isOffline && (
-                            <span className="bg-[#fef9ef] text-[#0a0a0a] px-2.5 py-0.5 rounded-lg text-[11px] font-extrabold uppercase flex items-center gap-1 shadow-xs">
-                              <span className="material-symbols-outlined text-[14px] text-[#ff4d8b]">co_present</span>
-                              Sesi Offline
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-sm text-white/90 leading-relaxed">
-                          {isOffline
-                            ? `${round.durationMinutes} Menit | Sesi Tatap Muka (Soal Ditampilkan via 1 Proyektor)`
-                            : `${round.durationMinutes} Menit | Batas Pindah Tab: ${round.tabSwitchLimit}x`}
-                        </p>
-
-                        {/* Schedule Badge */}
-                        <div className="mt-2 text-xs bg-black/15 border border-white/20 px-3 py-1.5 rounded-lg inline-flex items-center gap-2">
-                          <span className="material-symbols-outlined text-sm text-amber-200">calendar_clock</span>
-                          <span>Jadwal: <strong>{startDateStr} ({startTimeStr})</strong> s/d <strong>{endDateStr} ({endTimeStr})</strong></span>
-                        </div>
-                      </div>
-
-                      <div className="relative z-10 shrink-0 w-full md:w-auto">
-                        {isOffline ? (
-                          <div className="bg-white/20 backdrop-blur-xs border border-white/40 p-3.5 rounded-xl text-white text-xs max-w-xs space-y-1">
-                            <div className="flex items-center gap-1.5 font-black uppercase tracking-wider text-amber-200">
-                              <span className="material-symbols-outlined text-base">co_present</span>
-                              <span>Proyektor Sesi Offline</span>
-                            </div>
-                            <p className="text-[11px] leading-snug opacity-95">
-                              {round.isOfflineStarted
-                                ? '🔴 Sesi Offline Sedang Berlangsung di Kelas. Soal ditayangkan via proyektor utama.'
-                                : 'Ujian dilaksanakan secara offline di kelas. Soal akan ditayangkan via proyektor utama saat panitia memulai babak.'}
-                            </p>
-                          </div>
-                        ) : isNotStartedYet ? (
-                          <button
-                            disabled
-                            className="w-full md:w-auto bg-white/20 text-white cursor-not-allowed px-5 py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 border border-white/30"
-                          >
-                            <span className="material-symbols-outlined text-base">lock_clock</span>
-                            <span>Kuis Belum Dimulai</span>
-                          </button>
-                        ) : isClosed ? (
-                          <button
-                            disabled
-                            className="w-full md:w-auto bg-black/30 text-white/70 cursor-not-allowed px-5 py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 border border-white/10"
-                          >
-                            <span className="material-symbols-outlined text-base">event_busy</span>
-                            <span>Sesi Kuis Ditutup</span>
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => onNavigate('quiz')}
-                            className="w-full md:w-auto bg-white text-[#0a0a0a] hover:bg-gray-100 px-6 py-3 rounded-xl font-bold text-sm shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2 cursor-pointer"
-                          >
-                            <span>Mulai Kuis Sekarang</span>
-                            <span className="material-symbols-outlined text-sm">play_arrow</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                }
-
-                // Locked Status
-                return (
-                  <div
-                    key={round.id}
-                    className="clay-card bg-[#f5f0e0] rounded-2xl p-6 flex flex-col md:flex-row items-start md:items-center gap-6 border border-[#e7e2d8] opacity-75"
-                  >
-                    <div className="w-16 h-16 bg-[#e7e2d8] rounded-xl flex items-center justify-center shrink-0">
-                      <span className="material-symbols-outlined text-[#6a6a6a] text-4xl">
-                        {isOffline ? 'co_present' : 'lock'}
-                      </span>
-                    </div>
-
-                    <div className="flex-grow">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <h3 className="text-lg font-bold text-[#0a0a0a]">{round.title}</h3>
-                        <span className="bg-[#e8b94a]/20 text-[#e8b94a] px-2.5 py-0.5 rounded-lg text-[11px] font-bold uppercase">
-                          Terkunci
-                        </span>
-                        {isOffline && (
-                          <span className="bg-[#feaf83]/30 text-[#0a0a0a] px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase">
-                            Sesi Offline
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-sm text-[#6a6a6a]">
-                        Terbuka setelah kelulusan babak sebelumnya.{' '}
-                        {isOffline ? 'Dilaksanakan tatap muka dengan 1 proyektor.' : 'Dijadwalkan untuk babak mendatang.'}
-                      </p>
-                    </div>
-
-                    <div className="shrink-0">
-                      <span className="bg-[#f2ede4] px-3 py-1 rounded-md text-[10px] font-black text-[#6a6a6a]/60 border border-[#6a6a6a]/20">
-                        {round.isFinal ? 'FINAL' : 'REGULER'}
-                      </span>
-                    </div>
-                  </div>
-                );
-              }))}
+                })
+              )}
             </div>
           </div>
 
@@ -324,29 +357,40 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               </div>
             </div>
 
-            {/* Upcoming Dates Card */}
+            {/* Upcoming Agenda Card */}
             <div className="bg-[#f5f0e0] rounded-2xl p-6 border border-[#e7e2d8]">
-              <h3 className="font-bold text-base text-[#0a0a0a] mb-4">Agenda Mendatang</h3>
+              <h3 className="font-bold text-base text-[#0a0a0a] mb-4">Agenda OPTIMA 2026</h3>
               <div className="space-y-4">
                 <div className="flex items-center gap-4">
                   <div className="bg-[#a4d4c5]/30 w-12 h-12 rounded-xl flex flex-col items-center justify-center text-[#0a0a0a] shrink-0">
-                    <span className="text-[10px] font-bold">OKT</span>
-                    <span className="text-base font-black leading-none">28</span>
+                    <span className="text-[10px] font-bold">SEPT</span>
+                    <span className="text-base font-black leading-none">12</span>
                   </div>
                   <div>
-                    <p className="font-bold text-sm text-[#0a0a0a]">Webinar Langsung</p>
-                    <p className="text-xs text-[#6a6a6a]">Persiapan Kalkulus Lanjutan</p>
+                    <p className="font-bold text-sm text-[#0a0a0a]">Technical Meeting</p>
+                    <p className="text-xs text-[#6a6a6a]">09.00 - 12.00 WIB via Zoom</p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-4">
                   <div className="bg-[#b8a4ed]/30 w-12 h-12 rounded-xl flex flex-col items-center justify-center text-[#0a0a0a] shrink-0">
-                    <span className="text-[10px] font-bold">NOV</span>
-                    <span className="text-base font-black leading-none">05</span>
+                    <span className="text-[10px] font-bold">SEPT</span>
+                    <span className="text-base font-black leading-none">14</span>
                   </div>
                   <div>
-                    <p className="font-bold text-sm text-[#0a0a0a]">Batas Akhir Pendaftaran</p>
-                    <p className="text-xs text-[#6a6a6a]">Pengumpulan Babak Final</p>
+                    <p className="font-bold text-sm text-[#0a0a0a]">Opening &amp; Penyisihan</p>
+                    <p className="text-xs text-[#6a6a6a]">13.00 WIB Daring via Zoom</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <div className="bg-[#e8b94a]/30 w-12 h-12 rounded-xl flex flex-col items-center justify-center text-[#0a0a0a] shrink-0">
+                    <span className="text-[10px] font-bold">SEPT</span>
+                    <span className="text-base font-black leading-none">16</span>
+                  </div>
+                  <div>
+                    <p className="font-bold text-sm text-[#0a0a0a]">Tahap Final Offline</p>
+                    <p className="text-xs text-[#6a6a6a]">Kampus UIN SSC Cirebon</p>
                   </div>
                 </div>
               </div>

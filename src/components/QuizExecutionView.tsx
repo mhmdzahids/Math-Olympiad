@@ -1,60 +1,183 @@
 import React, { useState, useEffect } from 'react';
-import { ScreenView, Question } from '../types';
+import { ScreenView, Question, CompetitionRound } from '../types';
 import { MOCK_QUESTIONS, ASSET_IMAGES } from '../data/mockData';
+import { apiService } from '../services/api';
 
 interface QuizExecutionViewProps {
   onNavigate: (screen: ScreenView) => void;
+  activeRound?: CompetitionRound | null;
+  studentCategory?: string;
   questions?: Question[];
 }
 
 export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
   onNavigate,
-  questions = MOCK_QUESTIONS
+  activeRound,
+  studentCategory,
+  questions: propQuestions
 }) => {
-  const [currentIdx, setCurrentIdx] = useState(11); // Start at Q12 (index 11) matching the reference screenshot!
-  const [userAnswers, setUserAnswers] = useState<Record<number, 'A' | 'B' | 'C' | 'D'>>({
-    1: 'A', 2: 'B', 3: 'C', 4: 'A', 5: 'D',
-    6: 'B', 7: 'A', 8: 'C', 9: 'D', 10: 'A', 11: 'B',
-    12: 'B' // Option B selected for Q12 as in reference screenshot
-  });
-  const [flagged, setFlagged] = useState<Record<number, boolean>>({
-    13: true // Question 13 flagged as in reference screenshot
-  });
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const [userAnswers, setUserAnswers] = useState<Record<number, 'A' | 'B' | 'C' | 'D'>>({});
+  const [flagged, setFlagged] = useState<Record<number, boolean>>({});
 
-  const [timeLeft, setTimeLeft] = useState(45 * 60 + 30); // 45:30
-  const [tabSwitches, setTabSwitches] = useState(1); // Warning 1 / 3
-  const [showAntiCheatModal, setShowAntiCheatModal] = useState(true); // Open initially for instant visual matching!
-  const [lastActivityLog, setLastActivityLog] = useState('10:24:45 AM');
-  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [loadingQuestions, setLoadingQuestions] = useState<boolean>(true);
+  const [questions, setQuestions] = useState<Question[]>([]);
+
+  const maxSwitches = activeRound?.tabSwitchLimit || 3;
+  const durationMins = activeRound?.durationMinutes || 60;
+
+  const [timeLeft, setTimeLeft] = useState<number>(durationMins * 60);
+  const [tabSwitches, setTabSwitches] = useState<number>(0);
+  const [showAntiCheatModal, setShowAntiCheatModal] = useState<boolean>(false);
+  const [lastActivityLog, setLastActivityLog] = useState<string>('');
+  const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
+
+  // Anti-Cheat: Disable Copy, Paste & Context Menu
+  useEffect(() => {
+    const preventAction = (e: Event) => e.preventDefault();
+    document.addEventListener('contextmenu', preventAction);
+    document.addEventListener('copy', preventAction);
+    document.addEventListener('paste', preventAction);
+    return () => {
+      document.removeEventListener('contextmenu', preventAction);
+      document.removeEventListener('copy', preventAction);
+      document.removeEventListener('paste', preventAction);
+    };
+  }, []);
+
+  // UUID validation helper — mock IDs like "round-sd-1" are not valid UUIDs
+  const isValidUUID = (id: string) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+  // Fetch Questions from Secure Student Endpoint & Start Quiz Session
+  useEffect(() => {
+    let isMounted = true;
+    async function loadQuizData() {
+      setLoadingQuestions(true);
+
+      const roundId = activeRound?.id;
+      const isRealRound = roundId && isValidUUID(roundId);
+
+      if (isRealRound) {
+        try {
+          // 1. Start or resume Quiz Session from Backend Server
+          const session = await apiService.startQuizSession(roundId).catch(() => null);
+          if (!isMounted) return;
+
+          if (session) {
+            setTimeLeft(session.remaining_seconds);
+            setTabSwitches(session.tab_switch_count);
+            if (session.is_submitted) {
+              setIsSubmitted(true);
+            }
+          } else {
+            setTimeLeft((activeRound.durationMinutes || 60) * 60);
+          }
+
+          // 2. Fetch Questions WITHOUT correct_key (Secure Anti-Cheat Endpoint)
+          const dbQuestions = await apiService.getStudentQuestions(roundId);
+          if (!isMounted) return;
+          if (dbQuestions && dbQuestions.length > 0) {
+            const formatted: Question[] = dbQuestions.map((q, idx) => ({
+              id: idx + 1,
+              code: `SOAL ${idx + 1} • ${(activeRound.category || studentCategory || 'SD').toUpperCase()}`,
+              text: q.question_text,
+              diagramUrl: q.image_url,
+              options: (q.options || []).map((opt) => ({
+                id: (opt.key || 'A').toUpperCase() as 'A' | 'B' | 'C' | 'D',
+                text: opt.text
+              })),
+              correctOption: 'A', // Placeholder on client (correct answer is computed only at backend server!)
+            }));
+            setQuestions(formatted);
+          } else if (propQuestions && propQuestions.length > 0) {
+            setQuestions(propQuestions);
+          } else {
+            setQuestions(MOCK_QUESTIONS.slice(0, activeRound.questionCount || 25));
+          }
+        } catch (err) {
+          if (!isMounted) return;
+          console.warn('Could not load DB questions for active round:', err);
+          setQuestions(propQuestions || MOCK_QUESTIONS.slice(0, activeRound.questionCount || 25));
+        }
+      } else {
+        setQuestions(propQuestions || MOCK_QUESTIONS);
+        setTimeLeft((activeRound?.durationMinutes || 60) * 60);
+      }
+      if (isMounted) setLoadingQuestions(false);
+    }
+
+    loadQuizData();
+    return () => {
+      isMounted = false;
+    };
+  }, [activeRound, propQuestions, studentCategory]);
 
   // Timer Countdown effect
   useEffect(() => {
-    if (isSubmitted) return;
+    if (isSubmitted || loadingQuestions) return;
     const interval = setInterval(() => {
-      setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          setIsSubmitted(true);
+          if (activeRound?.id && isValidUUID(activeRound.id)) {
+            apiService.submitQuizAnswers(activeRound.id, userAnswers).catch(() => {});
+          }
+          alert('Waktu pengerjaan telah habis! Jawaban Anda telah otomatis dikumpulkan ke server.');
+          return 0;
+        }
+        return prev - 1;
+      });
     }, 1000);
     return () => clearInterval(interval);
-  }, [isSubmitted]);
+  }, [isSubmitted, loadingQuestions, activeRound, userAnswers]);
 
-  // Tab switch detection (window blur)
+  // Tab switch & Window Focus Mode Listener with Server Log
   useEffect(() => {
-    const handleBlur = () => {
-      if (isSubmitted) return;
-      setTabSwitches((prev) => {
-        const nextCount = prev + 1;
-        const now = new Date();
-        setLastActivityLog(now.toLocaleTimeString());
-        setShowAntiCheatModal(true);
-        if (nextCount >= 3) {
-          setIsSubmitted(true);
+    if (isSubmitted || loadingQuestions) return;
+
+    const handleBlur = async () => {
+      const now = new Date();
+      setLastActivityLog(now.toLocaleTimeString());
+      setShowAntiCheatModal(true);
+
+      if (activeRound?.id && isValidUUID(activeRound.id)) {
+        try {
+          const res = await apiService.logQuizViolation(activeRound.id);
+          setTabSwitches(res.tab_switch_count);
+          if (res.is_submitted) {
+            setIsSubmitted(true);
+          }
+        } catch {
+          setTabSwitches((prev) => {
+            const nextCount = prev + 1;
+            if (nextCount >= maxSwitches) setIsSubmitted(true);
+            return nextCount;
+          });
         }
-        return nextCount;
-      });
+      } else {
+        setTabSwitches((prev) => {
+          const nextCount = prev + 1;
+          if (nextCount >= maxSwitches) setIsSubmitted(true);
+          return nextCount;
+        });
+      }
+    };
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        handleBlur();
+      }
     };
 
     window.addEventListener('blur', handleBlur);
-    return () => window.removeEventListener('blur', handleBlur);
-  }, [isSubmitted]);
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      window.removeEventListener('blur', handleBlur);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [isSubmitted, loadingQuestions, maxSwitches, activeRound]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -62,9 +185,25 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
     return `${m}:${s < 10 ? '0' : ''}${s} Tersisa`;
   };
 
-  const currentQ = questions[currentIdx] || questions[0];
+  if (loadingQuestions) {
+    return (
+      <div className="bg-[#fef9ef] min-h-screen flex flex-col items-center justify-center p-6 text-[#0a0a0a]">
+        <div className="bg-white p-8 rounded-3xl clay-shadow border border-[#0a0a0a]/10 text-center space-y-4 max-w-sm w-full animate-pulse">
+          <span className="material-symbols-outlined text-4xl text-[#ff6b5a] animate-spin">
+            hourglass_top
+          </span>
+          <h3 className="font-black text-lg">Memuat Soal Ujian...</h3>
+          <p className="text-xs text-[#6a6a6a]">Menyiapkan kuis dan mengaktifkan Mode Fokus Olimpiade Aman.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const activeQuestions = questions.length > 0 ? questions : MOCK_QUESTIONS;
+  const currentQ = activeQuestions[currentIdx] || activeQuestions[0];
 
   const handleSelectOption = (optId: 'A' | 'B' | 'C' | 'D') => {
+    if (isSubmitted) return;
     setUserAnswers((prev) => ({
       ...prev,
       [currentQ.id]: optId
@@ -72,16 +211,24 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
   };
 
   const toggleFlagCurrent = () => {
+    if (isSubmitted) return;
     setFlagged((prev) => ({
       ...prev,
       [currentQ.id]: !prev[currentQ.id]
     }));
   };
 
-  const handleSubmitQuiz = () => {
+  const handleSubmitQuiz = async () => {
     if (window.confirm('Apakah Anda yakin ingin mengumpulkan kuis Anda?')) {
       setIsSubmitted(true);
-      alert('Kuis berhasil dikumpulkan!');
+      if (activeRound?.id && isValidUUID(activeRound.id)) {
+        try {
+          await apiService.submitQuizAnswers(activeRound.id, userAnswers);
+        } catch (err) {
+          console.warn('Backend quiz submit error:', err);
+        }
+      }
+      alert('Kuis berhasil dikumpulkan dan dinilai secara aman di server!');
       onNavigate('student-dashboard');
     }
   };
@@ -90,16 +237,13 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
     <div className="bg-[#fef9ef] min-h-screen flex flex-col text-[#1d1c16] antialiased select-none">
       {/* Top Bar Header */}
       <header className="bg-[#0a0a0a] h-16 flex items-center justify-between px-4 sm:px-6 z-40 sticky top-0 shadow-md">
-        <div className="flex items-center gap-4">
-          <button 
-            onClick={() => onNavigate('student-dashboard')}
-            className="text-white/80 hover:text-white flex items-center gap-1 text-xs font-semibold"
-          >
-            <span className="material-symbols-outlined text-sm">arrow_back</span>
-            <span className="hidden sm:inline">Dashboard</span>
-          </button>
-          <span className="text-white font-semibold text-sm sm:text-base opacity-90">
-            Soal {currentQ.id} dari {questions.length}
+        <div className="flex items-center gap-2">
+          <span className="bg-[#a4d4c5] text-[#0a0a0a] text-[10px] font-black uppercase px-2.5 py-1 rounded-full tracking-wider shadow-2xs flex items-center gap-1">
+            <span className="material-symbols-outlined text-[14px]">lock</span>
+            <span>Mode Fokus Aktif</span>
+          </span>
+          <span className="text-white font-semibold text-xs sm:text-sm opacity-90 hidden sm:inline">
+            {activeRound?.title ? activeRound.title : `Soal ${currentQ.id} dari ${activeQuestions.length}`}
           </span>
         </div>
 
@@ -115,18 +259,19 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
         <div className="flex items-center gap-3">
           <button
             onClick={() => setShowAntiCheatModal(true)}
-            className="hidden sm:flex text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg items-center gap-1"
+            className="hidden sm:flex text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg items-center gap-1 cursor-pointer"
             title="Simulasi Peringatan Tab"
           >
             <span className="material-symbols-outlined text-sm">security</span>
-            <span>Peringatan Tab ({tabSwitches}/3)</span>
+            <span>Peringatan Tab ({tabSwitches}/{maxSwitches})</span>
           </button>
 
           <button
             onClick={handleSubmitQuiz}
-            className="bg-white text-[#0a0a0a] hover:bg-[#e7e2d8] px-4 py-2 rounded-xl font-bold text-xs sm:text-sm clay-shadow-sm clay-button-active transition-all"
+            disabled={isSubmitted}
+            className="bg-white text-[#0a0a0a] hover:bg-[#e7e2d8] px-4 py-2 rounded-xl font-bold text-xs sm:text-sm clay-shadow-sm clay-button-active transition-all cursor-pointer disabled:opacity-50"
           >
-            Kirim Kuis
+            {isSubmitted ? 'Ter-Kirim' : 'Kirim Kuis'}
           </button>
         </div>
       </header>
@@ -139,7 +284,7 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
           <div className="bg-white p-6 sm:p-8 rounded-[24px] clay-shadow border border-[#f2ede4] flex flex-col md:flex-row gap-6 relative overflow-hidden">
             <div className="flex-1 flex flex-col gap-3">
               <span className="bg-[#a4d4c5] text-[#0a0a0a] px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider w-fit">
-                {currentQ.code}
+                {currentQ.code || `SOAL ${currentQ.id}`}
               </span>
               <h1 className="text-lg sm:text-xl font-bold text-[#000000] leading-snug">
                 {currentQ.text}
@@ -161,7 +306,7 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
                 />
                 <div className="absolute bottom-3 right-3 bg-[#0a0a0a]/10 px-2 py-0.5 rounded-lg backdrop-blur-sm">
                   <span className="text-[10px] font-bold text-[#0a0a0a]/70">
-                    {currentQ.figLabel || 'GAMBAR 12A'}
+                    {currentQ.figLabel || `GAMBAR ${currentQ.id}`}
                   </span>
                 </div>
               </div>
@@ -175,8 +320,9 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
               return (
                 <button
                   key={opt.id}
+                  disabled={isSubmitted}
                   onClick={() => handleSelectOption(opt.id)}
-                  className={`group flex items-center gap-4 p-4 rounded-[16px] text-left transition-all ${
+                  className={`group flex items-center gap-4 p-4 rounded-[16px] text-left transition-all cursor-pointer ${
                     isSelected
                       ? 'bg-[#feaf83]/10 border-2 border-[#feaf83] clay-shadow ring-4 ring-[#feaf83]/10'
                       : 'bg-white border-2 border-transparent clay-shadow-sm hover:border-[#a4d4c5] active:scale-[0.98]'
@@ -209,7 +355,7 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
             <button
               disabled={currentIdx === 0}
               onClick={() => setCurrentIdx((prev) => Math.max(0, prev - 1))}
-              className="flex items-center gap-1 text-[#6a6a6a] hover:text-[#0a0a0a] font-bold text-sm transition-colors disabled:opacity-40"
+              className="flex items-center gap-1 text-[#6a6a6a] hover:text-[#0a0a0a] font-bold text-sm transition-colors disabled:opacity-40 cursor-pointer"
             >
               <span className="material-symbols-outlined">chevron_left</span>
               <span>Sebelumnya</span>
@@ -217,8 +363,9 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
 
             <div className="flex gap-3">
               <button
+                disabled={isSubmitted}
                 onClick={toggleFlagCurrent}
-                className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm clay-shadow-sm clay-button-active flex items-center gap-1.5 transition-all ${
+                className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm clay-shadow-sm clay-button-active flex items-center gap-1.5 transition-all cursor-pointer ${
                   flagged[currentQ.id]
                     ? 'bg-[#e8b94a] text-[#0a0a0a]'
                     : 'bg-[#ebe6d6] text-[#0a0a0a] hover:bg-[#e7e2d8]'
@@ -229,9 +376,9 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
               </button>
 
               <button
-                disabled={currentIdx === questions.length - 1}
-                onClick={() => setCurrentIdx((prev) => Math.min(questions.length - 1, prev + 1))}
-                className="bg-[#0a0a0a] text-white hover:bg-[#0a0a0a]/90 px-6 py-2.5 rounded-xl font-bold text-xs sm:text-sm clay-shadow-sm clay-button-active transition-all"
+                disabled={currentIdx === activeQuestions.length - 1}
+                onClick={() => setCurrentIdx((prev) => Math.min(activeQuestions.length - 1, prev + 1))}
+                className="bg-[#0a0a0a] text-white hover:bg-[#0a0a0a]/90 px-6 py-2.5 rounded-xl font-bold text-xs sm:text-sm clay-shadow-sm clay-button-active transition-all cursor-pointer disabled:opacity-40"
               >
                 Soal Berikutnya
               </button>
@@ -244,13 +391,13 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-base text-[#0a0a0a]">Progres Kuis</h3>
             <span className="text-xs font-bold text-[#6a6a6a]">
-              {Object.keys(userAnswers).length} / {questions.length}
+              {Object.keys(userAnswers).length} / {activeQuestions.length}
             </span>
           </div>
 
           {/* Grid of Question Buttons */}
           <div className="grid grid-cols-5 gap-2">
-            {questions.map((q, idx) => {
+            {activeQuestions.map((q, idx) => {
               const isCurrent = idx === currentIdx;
               const isAnswered = !!userAnswers[q.id];
               const isFlagged = !!flagged[q.id];
@@ -268,7 +415,7 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
                 <button
                   key={q.id}
                   onClick={() => setCurrentIdx(idx)}
-                  className={`w-full aspect-square rounded-lg text-xs flex items-center justify-center transition-transform active:scale-90 ${btnStyle}`}
+                  className={`w-full aspect-square rounded-lg text-xs flex items-center justify-center transition-transform active:scale-90 cursor-pointer ${btnStyle}`}
                 >
                   {q.id}
                   {isFlagged && !isCurrent && (
@@ -294,8 +441,6 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
               <span className="text-[11px] font-bold text-[#6a6a6a]">Ditandai</span>
             </div>
           </div>
-
-
         </aside>
       </main>
 
@@ -322,33 +467,54 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
 
             <div className="space-y-2">
               <h2 className="text-2xl font-black text-[#0a0a0a] tracking-tight">
-                Terdeteksi Perpindahan Tab
+                {tabSwitches >= maxSwitches ? 'Ujian Di-Kumpulkan Otomatis' : 'Terdeteksi Perpindahan Tab'}
               </h2>
-              {/* Progress dots */}
+              {/* Dynamic progress indicator pills */}
               <div className="flex items-center justify-center gap-2 mt-2">
-                <div className={`h-2 w-12 rounded-full ${tabSwitches >= 1 ? 'bg-[#ff4d8b]' : 'bg-[#e7e2d8]'}`} />
-                <div className={`h-2 w-12 rounded-full ${tabSwitches >= 2 ? 'bg-[#ff4d8b]' : 'bg-[#e7e2d8]'}`} />
-                <div className={`h-2 w-12 rounded-full ${tabSwitches >= 3 ? 'bg-[#ff4d8b]' : 'bg-[#e7e2d8]'}`} />
+                {Array.from({ length: maxSwitches }).map((_, i) => (
+                  <div
+                    key={i}
+                    className={`h-2 rounded-full transition-all ${
+                      i < tabSwitches ? 'bg-[#ff4d8b]' : 'bg-[#e7e2d8]'
+                    }`}
+                    style={{ width: `${Math.max(20, Math.floor(140 / maxSwitches))}px` }}
+                  />
+                ))}
               </div>
               <p className="font-bold text-sm text-[#ff4d8b] pt-1">
-                Peringatan {Math.min(3, tabSwitches)} / 3
+                Peringatan {Math.min(maxSwitches, tabSwitches)} / {maxSwitches}
               </p>
             </div>
 
             <p className="text-sm text-[#6a6a6a] max-w-[280px]">
-              Mode Fokus Olimpiade Matematika aktif. Mencapai <span className="font-bold text-[#0a0a0a]">3 kali perpindahan tab</span> akan secara otomatis mengumpulkan kuis Anda.
+              {tabSwitches >= maxSwitches ? (
+                <span className="text-[#ff6b5a] font-bold">
+                  Batas maksimal {maxSwitches} kali perpindahan tab telah terlampaui. Kuis Anda telah dikumpulkan secara otomatis oleh sistem!
+                </span>
+              ) : (
+                <>
+                  Mode Fokus Olimpiade Matematika aktif. Mencapai <span className="font-bold text-[#0a0a0a]">{maxSwitches} kali perpindahan tab</span> akan secara otomatis mengumpulkan kuis Anda.
+                </>
+              )}
             </p>
 
             <button
-              onClick={() => setShowAntiCheatModal(false)}
-              className="w-full bg-[#0a0a0a] text-white py-3.5 rounded-2xl font-bold text-sm clay-shadow clay-button-active hover:bg-[#0a0a0a]/90 transition-all"
+              onClick={() => {
+                setShowAntiCheatModal(false);
+                if (tabSwitches >= maxSwitches) {
+                  onNavigate('student-dashboard');
+                }
+              }}
+              className="w-full bg-[#0a0a0a] text-white py-3.5 rounded-2xl font-bold text-sm clay-shadow clay-button-active hover:bg-[#0a0a0a]/90 transition-all cursor-pointer"
             >
-              Saya mengerti, kembali ke kuis
+              {tabSwitches >= maxSwitches ? 'Kembali ke Dashboard' : 'Saya mengerti, kembali ke kuis'}
             </button>
 
-            <p className="text-[10px] font-bold text-[#6a6a6a] uppercase tracking-wider opacity-70">
-              Aktivitas dicatat pada {lastActivityLog}
-            </p>
+            {lastActivityLog && (
+              <p className="text-[10px] font-bold text-[#6a6a6a] uppercase tracking-wider opacity-70">
+                Aktivitas dicatat pada {lastActivityLog}
+              </p>
+            )}
           </div>
         </div>
       )}
