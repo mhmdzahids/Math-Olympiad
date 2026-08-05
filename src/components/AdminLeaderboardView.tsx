@@ -5,6 +5,8 @@ import { apiService, RoundData } from '../services/api';
 
 interface AdminLeaderboardViewProps {
   onNavigate: (screen: ScreenView) => void;
+  onSelectParticipant?: (participantId: string) => void;
+  onShowToast?: (message: string, type?: 'success' | 'info' | 'warning', title?: string) => void;
 }
 
 // ----------------------------------------------------------------------
@@ -347,7 +349,11 @@ const SparkleStarIcon: React.FC = () => (
 // ----------------------------------------------------------------------
 // Main Component
 // ----------------------------------------------------------------------
-export const AdminLeaderboardView: React.FC<AdminLeaderboardViewProps> = ({ onNavigate, onShowToast }) => {
+export const AdminLeaderboardView: React.FC<AdminLeaderboardViewProps> = ({
+  onNavigate,
+  onSelectParticipant,
+  onShowToast
+}) => {
   const [selectedCategory, setSelectedCategory] = useState<'SD' | 'SMP' | 'SMA'>('SD');
   const [selectedRoundId, setSelectedRoundId] = useState<string | null>(null);
   const [rounds, setRounds] = useState<RoundData[]>([]);
@@ -706,7 +712,18 @@ export const AdminLeaderboardView: React.FC<AdminLeaderboardViewProps> = ({ onNa
                         </td>
 
                         <td className="px-6 py-4">
-                          <div className="font-bold text-[#0a0a0a]">{p.name}</div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (onSelectParticipant) {
+                                onSelectParticipant(p.id);
+                              }
+                            }}
+                            className="font-black text-[#0a0a0a] hover:text-[#ff6b5a] underline hover:no-underline cursor-pointer text-left transition-colors"
+                            title="Klik untuk melihat detail & breakdown submission peserta ini"
+                          >
+                            {p.name}
+                          </button>
                           {hasNoSession && (
                             <div className="text-[10px] font-semibold text-[#9a9a9a] mt-0.5 flex items-center gap-1">
                               <span className="material-symbols-outlined text-[13px]">block</span>

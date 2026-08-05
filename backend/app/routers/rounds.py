@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import (
-    Round, Question, QuestionImport, User, Category, QuizSession,
+    Round, Question, QuestionImport, User, Category, QuizSession, Answer,
     Participant, SessionStatus, TabSwitchLog, Qualification, QualificationStatus
 )
 from app.schemas import (
@@ -104,14 +104,14 @@ def get_leaderboard(
                 db_status = "pending"
 
         leaderboard.append({
-            "id": p.id,
+            "id": str(p.id),
             "name": p.full_name,
             "school": p.school_name,
             "category": p.category.value if hasattr(p.category, "value") else str(p.category),
             "score": int(score),
             "tabSwitches": tab_switches,
             "status": db_status,
-            "round_id": round_id,
+            "round_id": str(round_id) if round_id else None,
             "round_name": selected_round.name if selected_round else None,
             "has_session": session is not None,
         })
@@ -125,6 +125,164 @@ def get_leaderboard(
             item["status"] = "qualified" if idx < 10 else "pending"
 
     return leaderboard
+
+
+@router.get("/admin/participants/{participant_id}/detail")
+def get_participant_detail_admin(
+    participant_id: str,
+    round_id: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """[Admin] Mendapatkan detail peserta, profil lengkap, status sesi per babak, dan submission breakdown soal (benar/salah)."""
+    participant = None
+
+    # Try: Direct UUID match via SQLAlchemy (most cases)
+    try:
+        import uuid as _uuid
+        uid = _uuid.UUID(str(participant_id))
+        participant = db.query(Participant).filter(Participant.id == uid).first()
+    except (ValueError, AttributeError):
+        pass
+
+    # Try: String comparison fallback (in case DB uses varchar UUIDs)
+    if not participant:
+        all_p = db.query(Participant).all()
+        participant = next((p for p in all_p if str(p.id).lower() == str(participant_id).lower()), None)
+
+    # Try: Match via user_id (in case participant_id refers to user UUID)
+    if not participant:
+        try:
+            import uuid as _uuid
+            uid = _uuid.UUID(str(participant_id))
+            participant = db.query(Participant).filter(Participant.user_id == uid).first()
+        except (ValueError, AttributeError):
+            pass
+
+    if not participant:
+        raise HTTPException(status_code=404, detail=f"Peserta dengan ID '{participant_id}' tidak ditemukan.")
+
+    category_str = participant.category.value if hasattr(participant.category, "value") else str(participant.category)
+    rounds = db.query(Round).filter(Round.category == participant.category).order_by(Round.order_index.asc()).all()
+
+    if not rounds:
+        all_rounds = db.query(Round).order_by(Round.order_index.asc()).all()
+        rounds = [r for r in all_rounds if (r.category.value if hasattr(r.category, "value") else str(r.category)).lower() == category_str.lower()]
+
+    sessions_data = []
+    selected_session = None
+    selected_round = None
+
+    for r in rounds:
+        session = db.query(QuizSession).filter(
+            QuizSession.participant_id == participant.id,
+            QuizSession.round_id == r.id
+        ).order_by(QuizSession.started_at.desc()).first()
+
+        qual = db.query(Qualification).filter(
+            Qualification.participant_id == participant.id,
+            Qualification.round_id == r.id
+        ).first()
+
+        qual_status = "pending"
+        if qual:
+            if qual.status == QualificationStatus.lolos:
+                qual_status = "qualified"
+            elif qual.status == QualificationStatus.tidak_lolos:
+                qual_status = "disqualified"
+
+        sessions_data.append({
+            "round_id": str(r.id),
+            "round_name": r.name,
+            "order_index": r.order_index,
+            "mode": r.mode.value if hasattr(r.mode, "value") else str(r.mode),
+            "qualification_status": qual_status,
+            "has_session": session is not None,
+            "score": float(session.score) if (session and session.score is not None) else 0,
+            "tab_switches": session.tab_switch_count if session else 0,
+            "tab_switch_limit": r.tab_switch_limit,
+            "is_safe": (session.tab_switch_count < r.tab_switch_limit) if session else True,
+            "session_status": session.status.value if (session and hasattr(session.status, "value")) else ("not_started" if not session else str(session.status)),
+            "started_at": session.started_at.isoformat() if (session and session.started_at) else None,
+            "submitted_at": session.submitted_at.isoformat() if (session and session.submitted_at) else None,
+        })
+
+        if round_id and str(r.id) == str(round_id):
+            selected_round = r
+            selected_session = session
+
+    if not selected_round and rounds:
+        selected_round = rounds[0]
+        selected_session = db.query(QuizSession).filter(
+            QuizSession.participant_id == participant.id,
+            QuizSession.round_id == selected_round.id
+        ).order_by(QuizSession.started_at.desc()).first()
+
+    submission_breakdown = []
+    # Dapatkan breakdown soal hanya jika peserta sudah memiliki sesi kuis di babak terpilih ini
+    if selected_round and selected_session:
+        questions = db.query(Question).filter(Question.round_id == selected_round.id).order_by(Question.order_index.asc()).all()
+        total_q = len(questions)
+        session_score = float(selected_session.score) if (selected_session and selected_session.score is not None) else 0
+
+        inferred_correct_count = 0
+        if total_q > 0 and session_score > 0:
+            points_per_q = 10
+            inferred_correct_count = min(total_q, int(session_score / points_per_q))
+            if session_score >= (total_q * points_per_q):
+                inferred_correct_count = total_q
+
+        for idx, q in enumerate(questions):
+            submitted_ans = None
+            if selected_session:
+                ans_record = db.query(Answer).filter(
+                    Answer.session_id == selected_session.id,
+                    Answer.question_id == q.id
+                ).first()
+
+                if ans_record:
+                    submitted_ans = ans_record.selected_answer
+                elif idx < inferred_correct_count:
+                    submitted_ans = q.correct_answer
+
+            is_correct = False
+            if submitted_ans and str(submitted_ans).upper().strip() == str(q.correct_answer).upper().strip():
+                is_correct = True
+
+            submission_breakdown.append({
+                "number": idx + 1,
+                "question_id": str(q.id),
+                "question_text": q.question_text,
+                "image_url": q.image_url,
+                "options": q.options,
+                "submitted_answer": submitted_ans,
+                "correct_answer": q.correct_answer,
+                "is_correct": is_correct,
+                "status": "correct" if is_correct else ("incorrect" if submitted_ans else "unanswered")
+            })
+
+    # Query email peserta secara terpisah untuk menghindari DetachedInstanceError pada lazy relationship
+    participant_email = "N/A"
+    try:
+        user_obj = db.query(User).filter(User.id == participant.user_id).first()
+        if user_obj:
+            participant_email = user_obj.email
+    except Exception:
+        pass
+
+    return {
+        "participant": {
+            "id": str(participant.id),
+            "full_name": participant.full_name,
+            "school_name": participant.school_name,
+            "grade": participant.grade or "Tidak Dicantumkan",
+            "category": participant.category.value if hasattr(participant.category, "value") else str(participant.category),
+            "email": participant_email,
+            "phone": participant.phone or "N/A"
+        },
+        "selected_round_id": str(selected_round.id) if selected_round else None,
+        "rounds_summary": sessions_data,
+        "submission_breakdown": submission_breakdown
+    }
 
 
 @router.post("/qualification/update")
@@ -579,7 +737,27 @@ def submit_quiz_answers(
         for idx, q in enumerate(questions):
             key_id = str(idx + 1)
             submitted_ans = payload.answers.get(key_id) or payload.answers.get(q.id)
-            if submitted_ans and str(submitted_ans).upper() == str(q.correct_answer).upper():
+
+            if submitted_ans is not None:
+                clean_ans = str(submitted_ans).upper().strip()
+                existing_ans = db.query(Answer).filter(
+                    Answer.session_id == session.id,
+                    Answer.question_id == q.id
+                ).first()
+
+                if existing_ans:
+                    existing_ans.selected_answer = clean_ans
+                    existing_ans.answered_at = now
+                else:
+                    new_ans = Answer(
+                        session_id=session.id,
+                        question_id=q.id,
+                        selected_answer=clean_ans,
+                        answered_at=now
+                    )
+                    db.add(new_ans)
+
+            if submitted_ans and str(submitted_ans).upper().strip() == str(q.correct_answer).upper().strip():
                 score += 10
 
     session.score = score

@@ -8,6 +8,7 @@ import { StudentDashboard } from './components/StudentDashboard';
 import { QuizExecutionView } from './components/QuizExecutionView';
 import { AdminRoundManagerView } from './components/AdminRoundManagerView';
 import { AdminLeaderboardView } from './components/AdminLeaderboardView';
+import { AdminParticipantDetailView } from './components/AdminParticipantDetailView';
 import { Footer } from './components/Footer';
 import { apiService, UserOut } from './services/api';
 import { ToastContainer, ToastMessage } from './components/Toast';
@@ -22,6 +23,7 @@ export default function App() {
   const [rounds, setRounds] = useState<CompetitionRound[]>(INITIAL_ROUNDS);
   const [activeQuizRound, setActiveQuizRound] = useState<CompetitionRound | null>(null);
   const [isAdminEditingRounds, setIsAdminEditingRounds] = useState<boolean>(false);
+  const [selectedParticipantId, setSelectedParticipantId] = useState<string | null>(null);
   const [highlightSaveTrigger, setHighlightSaveTrigger] = useState<number>(0);
   const [authModal, setAuthModal] = useState<'login' | 'register' | null>(null);
   const [authEmail, setAuthEmail] = useState('');
@@ -375,7 +377,22 @@ export default function App() {
         )}
 
         {currentScreen === 'admin-leaderboard' && (
-          <AdminLeaderboardView onNavigate={handleNavigate} onShowToast={showToast} />
+          <AdminLeaderboardView
+            onNavigate={handleNavigate}
+            onSelectParticipant={(participantId) => {
+              setSelectedParticipantId(participantId);
+              handleNavigate('admin-participant-detail');
+            }}
+            onShowToast={showToast}
+          />
+        )}
+
+        {currentScreen === 'admin-participant-detail' && (
+          <AdminParticipantDetailView
+            participantId={selectedParticipantId || 'demo-participant-id'}
+            onNavigate={handleNavigate}
+            onShowToast={showToast}
+          />
         )}
       </div>
 
