@@ -49,20 +49,75 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
   const [isLoadingDbQuestions, setIsLoadingDbQuestions] = useState<boolean>(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [showImportOptionsModal, setShowImportOptionsModal] = useState<boolean>(false);
-  const [isLoadingPage, setIsLoadingPage] = useState<boolean>(true);
   const roundCardsContainerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    let isMounted = true;
-    const timer = setTimeout(() => {
-      if (isMounted) setIsLoadingPage(false);
-    }, 1200); // Constant 1.2-second realistic skeleton loader after login/navigation
+  // Drag and drop states for round cards reordering
+  const [draggedRoundId, setDraggedRoundId] = useState<string | null>(null);
+  const [dragOverRoundId, setDragOverRoundId] = useState<string | null>(null);
 
-    return () => {
-      isMounted = false;
-      clearTimeout(timer);
-    };
-  }, []);
+  const handleDragStart = (e: React.DragEvent, id: string) => {
+    setDraggedRoundId(id);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', id);
+  };
+
+  const handleDragOver = (e: React.DragEvent, id: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverRoundId !== id) {
+      setDragOverRoundId(id);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    const sourceId = draggedRoundId || e.dataTransfer.getData('text/plain');
+    setDraggedRoundId(null);
+    setDragOverRoundId(null);
+
+    if (!sourceId || sourceId === targetId) return;
+
+    const categoryRounds = currentRounds.filter(
+      (r) => (r.category || 'SD').toUpperCase() === selectedCategoryTab
+    );
+
+    const sourceIndex = categoryRounds.findIndex((r) => r.id === sourceId);
+    const targetIndex = categoryRounds.findIndex((r) => r.id === targetId);
+
+    if (sourceIndex === -1 || targetIndex === -1) return;
+
+    const reorderedCategoryRounds = [...categoryRounds];
+    const [movedRound] = reorderedCategoryRounds.splice(sourceIndex, 1);
+    reorderedCategoryRounds.splice(targetIndex, 0, movedRound);
+
+    let catIdx = 0;
+    const newRounds = currentRounds.map((r) => {
+      if ((r.category || 'SD').toUpperCase() === selectedCategoryTab) {
+        const item = reorderedCategoryRounds[catIdx];
+        catIdx++;
+        return item;
+      }
+      return r;
+    });
+
+    ensureEditMode();
+    updateRounds(newRounds);
+
+    reorderedCategoryRounds.forEach(async (r, index) => {
+      try {
+        await apiService.updateRound(r.id, { order_index: index + 1 });
+      } catch (err) {
+        console.warn('Failed to update order_index:', err);
+      }
+    });
+
+    onShowToast?.(`Urutan babak "${movedRound.title}" berhasil diubah!`, 'info', 'Urutan Diperbarui');
+  };
+
+  const handleDragEnd = () => {
+    setDraggedRoundId(null);
+    setDragOverRoundId(null);
+  };
 
   // Load existing questions from DB when expanding a round
   useEffect(() => {
@@ -109,16 +164,21 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
     };
   }, [expandedRoundId]);
 
-  // Synchronize TopNavbar selected round with category tab & expanded round card
+  const prevSelectedRoundTitleRef = useRef<string | undefined>(selectedRoundTitle);
+
+  // Synchronize TopNavbar selected round with category tab & expanded round card (only when selectedRoundTitle changes)
   useEffect(() => {
     if (!selectedRoundTitle) return;
-    const targetRound = currentRounds.find(
-      (r) => r.title === selectedRoundTitle || r.id === selectedRoundTitle
-    );
-    if (targetRound) {
-      const cat = (targetRound.category || 'SD').toUpperCase() as 'SD' | 'SMP' | 'SMA';
-      setSelectedCategoryTab(cat);
-      setExpandedRoundId(targetRound.id);
+    if (prevSelectedRoundTitleRef.current !== selectedRoundTitle) {
+      prevSelectedRoundTitleRef.current = selectedRoundTitle;
+      const targetRound = currentRounds.find(
+        (r) => r.title === selectedRoundTitle || r.id === selectedRoundTitle
+      );
+      if (targetRound) {
+        const cat = (targetRound.category || 'SD').toUpperCase() as 'SD' | 'SMP' | 'SMA';
+        setSelectedCategoryTab(cat);
+        setExpandedRoundId(targetRound.id);
+      }
     }
   }, [selectedRoundTitle, currentRounds]);
 
@@ -210,11 +270,23 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
 
     // Sync edited rounds to backend
     for (const r of sanitizedRounds) {
+      const sDate = r.startDate || '2026-08-01';
+      const sTime = r.startTime || '08:00';
+      const eDate = r.endDate || '2026-08-10';
+      const eTime = r.endTime || '18:00';
+      const startDt = new Date(`${sDate}T${sTime}:00`);
+      const endDt = new Date(`${eDate}T${eTime}:00`);
+      const now = new Date();
+
+      const computedDbStatus: 'aktif' | 'ditutup' | 'belum_dibuka' =
+        r.status === 'locked' ? 'belum_dibuka' : now > endDt ? 'ditutup' : now < startDt ? 'belum_dibuka' : 'aktif';
+
       try {
         await apiService.updateRound(r.id, {
           name: r.title,
           category: r.category.toLowerCase() as 'sd' | 'smp' | 'sma',
           mode: r.executionMode,
+          status: computedDbStatus,
           duration_minutes: r.durationMinutes,
           question_count: r.questionCount,
           tab_switch_limit: r.tabSwitchLimit,
@@ -625,48 +697,6 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
     }
   };
 
-  if (isLoadingPage) {
-    return (
-      <div className="w-full bg-[#fef9ef] min-h-screen pb-32">
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
-          {/* Header Banner Skeleton */}
-          <div className="bg-[#fffaf0] rounded-[32px] p-6 sm:p-8 border-2 border-[#0a0a0a]/10 clay-shadow-sm space-y-4 animate-pulse">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="space-y-2">
-                <div className="w-48 h-4 rounded-md bg-[#0a0a0a]/10" />
-                <div className="w-72 sm:w-96 h-8 rounded-2xl bg-[#0a0a0a]/15" />
-              </div>
-              <div className="w-36 h-11 rounded-2xl bg-[#0a0a0a]/15" />
-            </div>
-          </div>
-
-          {/* Category Tabs Skeleton */}
-          <div className="flex items-center gap-3">
-            <div className="w-28 h-11 rounded-2xl bg-[#0a0a0a]/10 animate-pulse" />
-            <div className="w-28 h-11 rounded-2xl bg-[#0a0a0a]/10 animate-pulse" />
-            <div className="w-28 h-11 rounded-2xl bg-[#0a0a0a]/10 animate-pulse" />
-          </div>
-
-          {/* Round Cards Skeleton */}
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="bg-white rounded-[24px] p-5 border-2 border-[#0a0a0a]/10 clay-shadow-sm animate-pulse flex items-center justify-between"
-              >
-                <div className="space-y-2">
-                  <div className="w-56 h-6 rounded-lg bg-[#0a0a0a]/15" />
-                  <div className="w-36 h-4 rounded-md bg-[#0a0a0a]/10" />
-                </div>
-                <div className="w-10 h-10 rounded-2xl bg-[#0a0a0a]/10" />
-              </div>
-            ))}
-          </div>
-        </main>
-      </div>
-    );
-  }
-
   return (
     <div className="w-full bg-[#fffaf0] min-h-screen pb-32">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
@@ -870,17 +900,31 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                   return (
                     <div
                       key={round.id}
-                      className={`rounded-[24px] p-4 sm:p-5 border-2 transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] relative ${isExpanded
-                        ? 'bg-[#fef9ef] border-[#0a0a0a]/20 clay-shadow ring-2 ring-[#feaf83]/20'
-                        : 'bg-[#f5f0e0] border-[#0a0a0a]/10 hover:bg-[#ebe6d6] clay-shadow-sm'
-                        }`}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, round.id)}
+                      onDragOver={(e) => handleDragOver(e, round.id)}
+                      onDrop={(e) => handleDrop(e, round.id)}
+                      onDragEnd={handleDragEnd}
+                      className={`rounded-[24px] p-4 sm:p-5 border-2 transition-all duration-300 relative ${
+                        draggedRoundId === round.id ? 'opacity-40 scale-[0.98] border-dashed border-[#0a0a0a]' : ''
+                      } ${
+                        dragOverRoundId === round.id ? 'ring-4 ring-[#feaf83] border-[#0a0a0a]' : ''
+                      } ${
+                        isExpanded
+                          ? 'bg-[#fef9ef] border-[#0a0a0a]/20 clay-shadow ring-2 ring-[#feaf83]/20'
+                          : 'bg-[#f5f0e0] border-[#0a0a0a]/10 hover:bg-[#ebe6d6] clay-shadow-sm'
+                      }`}
                     >
                       <div
                         onClick={() => toggleExpand(round.id)}
                         className="flex items-center justify-between flex-wrap gap-2 cursor-pointer select-none"
                       >
                         <div className="flex items-center gap-3">
-                          <span className="material-symbols-outlined text-[#6a6a6a] cursor-move" onClick={(e) => e.stopPropagation()}>
+                          <span
+                            className="material-symbols-outlined text-[#6a6a6a] hover:text-[#0a0a0a] cursor-grab active:cursor-grabbing p-1 rounded hover:bg-[#0a0a0a]/5 transition-colors shrink-0"
+                            title="Tahan & geser untuk mengubah urutan babak"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             drag_indicator
                           </span>
                           <div>
@@ -897,6 +941,38 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                                   <span>Online</span>
                                 </span>
                               )}
+
+                              {(() => {
+                                const sDate = round.startDate || '2026-08-01';
+                                const sTime = round.startTime || '08:00';
+                                const eDate = round.endDate || '2026-08-10';
+                                const eTime = round.endTime || '18:00';
+                                const startDt = new Date(`${sDate}T${sTime}:00`);
+                                const endDt = new Date(`${eDate}T${eTime}:00`);
+                                const now = new Date();
+
+                                const isClosed = now > endDt;
+                                const isUpcoming = now < startDt;
+
+                                return (
+                                  <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider flex items-center gap-1 border shadow-2xs ${
+                                    round.status === 'locked'
+                                      ? 'bg-gray-100 text-gray-600 border-gray-300'
+                                      : isClosed
+                                      ? 'bg-red-100 text-red-700 border-red-300'
+                                      : isUpcoming
+                                      ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                      : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                  }`}>
+                                    <span className="material-symbols-outlined text-[12px]">
+                                      {round.status === 'locked' ? 'lock' : isClosed ? 'event_busy' : isUpcoming ? 'schedule' : 'check_circle'}
+                                    </span>
+                                    <span>
+                                      {round.status === 'locked' ? 'Terkunci' : isClosed ? 'Ditutup (Waktu Habis)' : isUpcoming ? 'Belum Dimulai' : 'Aktif'}
+                                    </span>
+                                  </span>
+                                );
+                              })()}
                             </div>
                             <p className="text-xs text-[#6a6a6a]">
                               {round.questionCount} Soal • {round.durationMinutes} Menit {isOffline ? '• Proyektor Kelas' : ''}

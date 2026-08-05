@@ -183,6 +183,25 @@ const ROUND_ACCENT: Record<number, { active: string; outline: string; icon: stri
 };
 const DEFAULT_ACCENT = { active: 'bg-[#ebe6d6] text-[#0a0a0a]', outline: 'outline-[#ebe6d6]', icon: 'radio_button_checked' };
 
+const getEffectiveRoundStatusKey = (round: RoundData): string => {
+  if (round.status === 'selesai' || (round.status as string) === 'ditutup') {
+    return 'ditutup';
+  }
+  if (round.end_date) {
+    const sDate = round.start_date || '2026-08-01';
+    const sTime = round.start_time || '08:00';
+    const eDate = round.end_date;
+    const eTime = round.end_time || '18:00';
+    const startDt = new Date(`${sDate}T${sTime}:00`);
+    const endDt = new Date(`${eDate}T${eTime}:00`);
+    const now = new Date();
+
+    if (now > endDt) return 'ditutup';
+    if (now < startDt) return 'belum_dibuka';
+  }
+  return round.status === 'draft' ? 'belum_dibuka' : round.status;
+};
+
 const RoundSelector: React.FC<RoundSelectorProps> = ({ rounds, selectedRoundId, onSelect, isLoading }) => {
   if (isLoading) {
     return (
@@ -227,7 +246,8 @@ const RoundSelector: React.FC<RoundSelectorProps> = ({ rounds, selectedRoundId, 
       {rounds.map((round) => {
         const isSelected = selectedRoundId === round.id;
         const accent = ROUND_ACCENT[round.order_index] ?? DEFAULT_ACCENT;
-        const statusStyle = ROUND_STATUS_STYLE[round.status] ?? ROUND_STATUS_STYLE.belum_dibuka;
+        const statusKey = getEffectiveRoundStatusKey(round);
+        const statusStyle = ROUND_STATUS_STYLE[statusKey] ?? ROUND_STATUS_STYLE.belum_dibuka;
 
         return (
           <button
@@ -620,12 +640,16 @@ export const AdminLeaderboardView: React.FC<AdminLeaderboardViewProps> = ({ onNa
                 </span>
               </div>
             </div>
-            {activeRound && (
-              <span className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold ${ROUND_STATUS_STYLE[activeRound.status]?.bg ?? 'bg-[#ebe6d6]'} ${ROUND_STATUS_STYLE[activeRound.status]?.text ?? 'text-[#6a6a6a]'}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${ROUND_STATUS_STYLE[activeRound.status]?.dot ?? 'bg-[#9a9a9a]'}`} />
-                {ROUND_STATUS_STYLE[activeRound.status]?.label ?? '-'}
-              </span>
-            )}
+            {activeRound && (() => {
+              const statusKey = getEffectiveRoundStatusKey(activeRound);
+              const statusStyle = ROUND_STATUS_STYLE[statusKey] ?? ROUND_STATUS_STYLE.belum_dibuka;
+              return (
+                <span className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold ${statusStyle.bg} ${statusStyle.text}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.dot}`} />
+                  {statusStyle.label}
+                </span>
+              );
+            })()}
           </div>
 
           <div className="overflow-x-auto">

@@ -96,48 +96,81 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
           {/* Welcome Banner Skeleton */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-pulse">
             <div className="space-y-3">
-              <div className="w-48 h-4 rounded-md bg-[#0a0a0a]/10" />
-              <div className="w-72 sm:w-96 h-10 rounded-2xl bg-[#0a0a0a]/15" />
-              <div className="w-64 sm:w-80 h-4 rounded-md bg-[#0a0a0a]/10" />
+              <div className="w-48 h-4 rounded-md bg-[#ff6b5a]/20" />
+              <div className="w-72 sm:w-[480px] h-10 rounded-2xl bg-[#0a0a0a]/15" />
+              <div className="w-64 sm:w-96 h-4 rounded-md bg-[#0a0a0a]/10" />
             </div>
-            <div className="w-36 h-11 rounded-2xl bg-[#0a0a0a]/10" />
+            <div className="w-40 h-16 rounded-2xl bg-[#ebe6d6] border border-[#0a0a0a]/10 shrink-0 self-start sm:self-auto" />
           </div>
 
-          {/* Category Filter Pills Skeleton */}
-          <div className="flex items-center gap-3 pt-2">
-            <div className="w-24 h-11 rounded-2xl bg-[#0a0a0a]/10 animate-pulse" />
-            <div className="w-24 h-11 rounded-2xl bg-[#0a0a0a]/10 animate-pulse" />
-            <div className="w-24 h-11 rounded-2xl bg-[#0a0a0a]/10 animate-pulse" />
-          </div>
+          {/* Main 2-Column Layout Skeleton */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+            
+            {/* Left Column (2 Cols): Round Cards Stack */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Section Title Skeleton */}
+              <div className="w-64 h-8 rounded-xl bg-[#0a0a0a]/15 animate-pulse" />
 
-          {/* Exam Guidelines Banner Skeleton */}
-          <div className="bg-[#fffaf0] rounded-[32px] p-6 sm:p-8 border-2 border-[#0a0a0a]/10 clay-shadow-sm space-y-4 animate-pulse">
-            <div className="w-40 h-5 rounded-md bg-[#0a0a0a]/10" />
-            <div className="w-3/4 h-8 rounded-xl bg-[#0a0a0a]/15" />
-            <div className="w-2/3 h-4 rounded-md bg-[#0a0a0a]/10" />
-          </div>
+              {/* Stacked Horizontal Round Cards Skeleton */}
+              <div className="space-y-5">
+                {[1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className="bg-[#f5f0e0]/70 rounded-[24px] p-5 sm:p-6 border-2 border-[#0a0a0a]/10 clay-shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-pulse"
+                  >
+                    <div className="flex items-start sm:items-center gap-4 flex-1">
+                      {/* Left Square Icon Box */}
+                      <div className="w-12 h-12 rounded-2xl bg-[#0a0a0a]/10 shrink-0" />
+                      {/* Middle Information */}
+                      <div className="space-y-2.5 flex-1">
+                        <div className="w-48 sm:w-64 h-6 rounded-lg bg-[#0a0a0a]/15" />
+                        <div className="w-36 h-5 rounded-full bg-[#a4d4c5]/40" />
+                        <div className="w-56 sm:w-80 h-3.5 rounded-md bg-[#0a0a0a]/10" />
+                      </div>
+                    </div>
+                    {/* Right Action Pill Button */}
+                    <div className="w-full sm:w-44 h-11 rounded-2xl bg-[#0a0a0a]/15 shrink-0" />
+                  </div>
+                ))}
+              </div>
+            </div>
 
-          {/* Active Round Cards Grid Skeleton */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="bg-white rounded-[28px] p-6 border-2 border-[#0a0a0a]/10 clay-shadow-sm space-y-5 animate-pulse"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="w-24 h-6 rounded-full bg-[#0a0a0a]/10" />
-                  <div className="w-20 h-6 rounded-full bg-[#0a0a0a]/10" />
+            {/* Right Column (1 Col): Qualification Card & Agenda Card */}
+            <div className="space-y-6">
+              
+              {/* Qualification Status Card Skeleton */}
+              <div className="bg-[#ffdcd0]/70 rounded-[28px] p-6 border-2 border-[#0a0a0a]/10 clay-shadow-sm space-y-4 animate-pulse">
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 rounded-md bg-[#ff6b5a]/30" />
+                  <div className="w-36 h-5 rounded-md bg-[#0a0a0a]/15" />
                 </div>
-                <div className="space-y-2">
-                  <div className="w-3/4 h-7 rounded-xl bg-[#0a0a0a]/15" />
-                  <div className="w-1/2 h-4 rounded-md bg-[#0a0a0a]/10" />
+                <div className="bg-white/80 rounded-2xl p-4 space-y-2 border border-[#0a0a0a]/5">
+                  <div className="w-28 h-3.5 rounded-md bg-[#0a0a0a]/10" />
+                  <div className="w-44 h-5 rounded-lg bg-[#0a0a0a]/15" />
                 </div>
-                <div className="pt-4 border-t border-[#0a0a0a]/5 flex items-center justify-between">
-                  <div className="w-28 h-5 rounded-md bg-[#0a0a0a]/10" />
-                  <div className="w-28 h-10 rounded-2xl bg-[#0a0a0a]/15" />
+                <div className="w-full h-8 rounded-md bg-[#0a0a0a]/10" />
+              </div>
+
+              {/* Agenda OPTIMA Card Skeleton */}
+              <div className="bg-[#f5f0e0]/70 rounded-[28px] p-6 border-2 border-[#0a0a0a]/10 clay-shadow-sm space-y-5 animate-pulse">
+                <div className="w-44 h-6 rounded-md bg-[#0a0a0a]/15" />
+                
+                {/* 3 Agenda Items */}
+                <div className="space-y-4 pt-1">
+                  {[1, 2, 3].map((item) => (
+                    <div key={item} className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-2xl bg-[#a4d4c5]/40 shrink-0" />
+                      <div className="space-y-1.5 flex-1">
+                        <div className="w-36 h-4 rounded-md bg-[#0a0a0a]/15" />
+                        <div className="w-28 h-3 rounded-md bg-[#0a0a0a]/10" />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-            ))}
+
+            </div>
+
           </div>
         </div>
       </div>
@@ -270,8 +303,10 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                             </div>
                             <div>
                               <div className="flex items-center gap-2 flex-wrap mb-1">
-                                <span className="bg-[#0a0a0a] text-white text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider shadow-2xs">
-                                  BABAK AKTIF
+                                <span className={`text-white text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider shadow-2xs ${
+                                  isAfter ? 'bg-[#ba1a1a]' : isBefore ? 'bg-[#6a6a6a]' : 'bg-[#0a0a0a]'
+                                }`}>
+                                  {isAfter ? 'BABAK DITUTUP' : isBefore ? 'BELUM DIMULAI' : 'BABAK AKTIF'}
                                 </span>
                                 {isOngoingSession && (
                                   <span className="bg-[#ba1a1a] text-white text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider animate-pulse shadow-2xs">

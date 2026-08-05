@@ -6,13 +6,16 @@ interface LandingViewProps {
   onNavigate: (screen: ScreenView) => void;
   onRegisterSuccess?: (userData: any) => void;
   isLoggedIn?: boolean;
+  userRole?: string;
 }
 
 export const LandingView: React.FC<LandingViewProps> = ({
   onNavigate,
-  isLoggedIn = false
+  isLoggedIn = false,
+  userRole,
 }) => {
   const [ruleModalCategory, setRuleModalCategory] = useState<'sd-smp' | 'sma' | null>(null);
+  const dashboardScreen: ScreenView = userRole === 'admin' ? 'admin-leaderboard' : 'student-dashboard';
 
   return (
     <div className="w-full bg-[#fef9ef] min-h-screen pb-20">
@@ -43,7 +46,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
               {/* Action Buttons */}
               <div className="flex flex-wrap items-center gap-4 pt-2">
                 <button
-                  onClick={() => onNavigate(isLoggedIn ? 'student-dashboard' : 'register')}
+                  onClick={() => onNavigate(isLoggedIn ? dashboardScreen : 'register')}
                   className="bg-[#0a0a0a] hover:bg-[#0a0a0a]/90 text-white font-semibold px-8 py-3.5 rounded-full flex items-center gap-2 clay-shadow clay-button-active transition-all"
                 >
                   <span>{isLoggedIn ? 'Buka Dashboard' : 'Daftar OPTIMA 2026'}</span>
@@ -292,7 +295,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
               </div>
 
               <button
-                onClick={() => onNavigate(isLoggedIn ? 'student-dashboard' : 'register')}
+                onClick={() => onNavigate(isLoggedIn ? dashboardScreen : 'register')}
                 className="w-full bg-[#0a0a0a] hover:bg-[#0a0a0a]/90 text-white font-bold py-2.5 rounded-lg clay-shadow transition-all text-xs flex items-center justify-center gap-1.5 mt-4"
               >
                 <span>{isLoggedIn ? 'Buka Dashboard' : 'Daftar Kategori SD'}</span>
@@ -336,7 +339,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
               </div>
 
               <button
-                onClick={() => onNavigate(isLoggedIn ? 'student-dashboard' : 'register')}
+                onClick={() => onNavigate(isLoggedIn ? dashboardScreen : 'register')}
                 className="w-full bg-[#0a0a0a] hover:bg-[#0a0a0a]/90 text-white font-bold py-2.5 rounded-lg clay-shadow transition-all text-xs flex items-center justify-center gap-1.5 mt-4"
               >
                 <span>{isLoggedIn ? 'Buka Dashboard' : 'Daftar Kategori SMP'}</span>
@@ -380,7 +383,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
               </div>
 
               <button
-                onClick={() => onNavigate(isLoggedIn ? 'student-dashboard' : 'register')}
+                onClick={() => onNavigate(isLoggedIn ? dashboardScreen : 'register')}
                 className="w-full bg-[#0a0a0a] hover:bg-[#0a0a0a]/90 text-white font-bold py-2.5 rounded-lg clay-shadow transition-all text-xs flex items-center justify-center gap-1.5 mt-4"
               >
                 <span>{isLoggedIn ? 'Buka Dashboard' : 'Daftar Kategori SMA'}</span>
@@ -542,7 +545,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
                 <button
                   onClick={() => {
                     setRuleModalCategory(null);
-                    onNavigate(isLoggedIn ? 'student-dashboard' : 'register');
+                    onNavigate(isLoggedIn ? dashboardScreen : 'register');
                   }}
                   className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 bg-[#0a0a0a] hover:bg-[#0a0a0a]/90 text-white font-bold py-2.5 px-6 rounded-xl text-xs transition-all"
                 >
