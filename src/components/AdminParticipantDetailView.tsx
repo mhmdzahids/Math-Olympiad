@@ -20,6 +20,7 @@ export const AdminParticipantDetailView: React.FC<AdminParticipantDetailViewProp
   const [questionFilter, setQuestionFilter] = useState<'all' | 'correct' | 'incorrect' | 'unanswered'>('all');
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState<boolean>(false);
+  const [isResettingSession, setIsResettingSession] = useState<boolean>(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -109,6 +110,24 @@ export const AdminParticipantDetailView: React.FC<AdminParticipantDetailViewProp
       onShowToast?.(err.message || 'Gagal memperbarui status kualifikasi', 'warning', 'Gagal Simpan');
     } finally {
       setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleResetSession = async () => {
+    if (!selectedRoundId) return;
+    const confirmReset = window.confirm("Apakah Anda yakin ingin mereset sesi kuis ini? Seluruh jawaban dan riwayat pelanggaran akan dihapus permanen!");
+    if (!confirmReset) return;
+
+    setIsResettingSession(true);
+    try {
+      await apiService.resetParticipantSession(participant.id, selectedRoundId);
+      onShowToast?.("Sesi ujian peserta berhasil direset.", "success", "Reset Berhasil");
+      const refreshed = await apiService.getParticipantDetail(participant.id, selectedRoundId);
+      setData(refreshed);
+    } catch (err: any) {
+      onShowToast?.(err.message || "Gagal mereset sesi kuis.", "warning", "Gagal Reset");
+    } finally {
+      setIsResettingSession(false);
     }
   };
 
@@ -299,6 +318,20 @@ export const AdminParticipantDetailView: React.FC<AdminParticipantDetailViewProp
                     </div>
                   );
                 })()}
+
+                {activeRoundSummary.has_session && (
+                  <button
+                    type="button"
+                    onClick={handleResetSession}
+                    disabled={isResettingSession}
+                    className="w-full mt-2 py-3 rounded-2xl border-2 border-[#ba1a1a]/30 bg-[#ffdad6]/20 text-[#ba1a1a] font-bold text-sm flex items-center justify-center gap-2 clay-shadow-sm hover:bg-[#ffdad6]/50 transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-lg">
+                      {isResettingSession ? 'hourglass_empty' : 'restart_alt'}
+                    </span>
+                    {isResettingSession ? 'Mereset...' : 'Reset Sesi Kuis'}
+                  </button>
+                )}
               </div>
             )}
 

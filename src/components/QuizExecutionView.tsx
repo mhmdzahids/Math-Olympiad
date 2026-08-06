@@ -19,8 +19,21 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
   questions: propQuestions
 }) => {
   const [currentIdx, setCurrentIdx] = useState(0);
-  const [userAnswers, setUserAnswers] = useState<Record<number, 'A' | 'B' | 'C' | 'D'>>({});
-  const [flagged, setFlagged] = useState<Record<number, boolean>>({});
+  const [userAnswers, setUserAnswers] = useState<Record<number, 'A' | 'B' | 'C' | 'D'>>(() => {
+    if (activeRound?.id) {
+      const saved = localStorage.getItem(`optima_ans_${activeRound.id}`);
+      if (saved) return JSON.parse(saved);
+    }
+    return {};
+  });
+
+  const [flagged, setFlagged] = useState<Record<number, boolean>>(() => {
+    if (activeRound?.id) {
+      const saved = localStorage.getItem(`optima_flg_${activeRound.id}`);
+      if (saved) return JSON.parse(saved);
+    }
+    return {};
+  });
 
   const [loadingQuestions, setLoadingQuestions] = useState<boolean>(true);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -31,12 +44,34 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
   const [timeLeft, setTimeLeft] = useState<number>(durationMins * 60);
   const [tabSwitches, setTabSwitches] = useState<number>(0);
   const [showAntiCheatModal, setShowAntiCheatModal] = useState<boolean>(false);
-  const [showTutorialModal, setShowTutorialModal] = useState<boolean>(true);
+  const [showTutorialModal, setShowTutorialModal] = useState<boolean>(() => {
+    if (activeRound?.id) {
+      return localStorage.getItem(`optima_tut_${activeRound.id}`) !== 'true';
+    }
+    return true;
+  });
   const [lastActivityLog, setLastActivityLog] = useState<string>('');
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
 
   // Ref to prevent double-triggering when both 'blur' and 'visibilitychange' fire for 1 tab switch
   const lastViolationTimeRef = useRef<number>(0);
+
+  const userAnswersRef = useRef(userAnswers);
+  const flaggedRef = useRef(flagged);
+
+  useEffect(() => {
+    userAnswersRef.current = userAnswers;
+    if (activeRound?.id) {
+      localStorage.setItem(`optima_ans_${activeRound.id}`, JSON.stringify(userAnswers));
+    }
+  }, [userAnswers, activeRound?.id]);
+
+  useEffect(() => {
+    flaggedRef.current = flagged;
+    if (activeRound?.id) {
+      localStorage.setItem(`optima_flg_${activeRound.id}`, JSON.stringify(flagged));
+    }
+  }, [flagged, activeRound?.id]);
 
   // Anti-Cheat: Disable Copy, Paste & Context Menu
   useEffect(() => {
@@ -128,7 +163,7 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
           clearInterval(interval);
           setIsSubmitted(true);
           if (activeRound?.id && isValidUUID(activeRound.id)) {
-            apiService.submitQuizAnswers(activeRound.id, userAnswers).catch(() => {});
+            apiService.submitQuizAnswers(activeRound.id, userAnswersRef.current).catch(() => {});
           }
           alert('Waktu pengerjaan telah habis! Jawaban Anda telah otomatis dikumpulkan ke server.');
           return 0;
@@ -137,7 +172,7 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [isSubmitted, loadingQuestions, showTutorialModal, activeRound, userAnswers]);
+  }, [isSubmitted, loadingQuestions, showTutorialModal, activeRound]);
 
   // Tab switch & Window Focus Mode Listener with Server Log (Debounced)
   useEffect(() => {
@@ -161,18 +196,25 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
           setTabSwitches(res.tab_switch_count);
           if (res.is_submitted) {
             setIsSubmitted(true);
+            await apiService.submitQuizAnswers(activeRound.id, userAnswersRef.current).catch(() => {});
           }
         } catch {
           setTabSwitches((prev) => {
             const nextCount = prev + 1;
-            if (nextCount >= maxSwitches) setIsSubmitted(true);
+            if (nextCount >= maxSwitches) {
+              setIsSubmitted(true);
+              apiService.submitQuizAnswers(activeRound.id, userAnswersRef.current).catch(() => {});
+            }
             return nextCount;
           });
         }
       } else {
         setTabSwitches((prev) => {
           const nextCount = prev + 1;
-          if (nextCount >= maxSwitches) setIsSubmitted(true);
+          if (nextCount >= maxSwitches) {
+            setIsSubmitted(true);
+            if (activeRound?.id) apiService.submitQuizAnswers(activeRound.id, userAnswersRef.current).catch(() => {});
+          }
           return nextCount;
         });
       }
@@ -535,7 +577,12 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
       {/* Interactive Walkthrough Tutorial Modal Before Quiz Timer Starts */}
       <QuizTutorialModal
         isOpen={showTutorialModal}
-        onComplete={() => setShowTutorialModal(false)}
+        onComplete={() => {
+          setShowTutorialModal(false);
+          if (activeRound?.id) {
+            localStorage.setItem(`optima_tut_${activeRound.id}`, 'true');
+          }
+        }}
         activeRoundTitle={activeRound?.title || 'Babak Penyisihan 1 (SD)'}
         durationMinutes={durationMins}
         maxSwitches={maxSwitches}
