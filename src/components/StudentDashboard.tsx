@@ -432,7 +432,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                           )}
                         </div>
                         <p className="text-sm text-[#6a6a6a]">
-                          Terbuka untuk 10 peserta terbaik yang lolos dari babak penyisihan.
+                          {round.title.toLowerCase().includes('final')
+                            ? 'Terbuka untuk peserta yang lolos dari babak sebelumnya.'
+                            : 'Babak ini akan dapat diakses saat waktu pelaksanaannya tiba.'}
                         </p>
                       </div>
 

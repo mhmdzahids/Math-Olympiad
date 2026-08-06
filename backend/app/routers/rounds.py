@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import (
     Round, Question, QuestionImport, User, Category, QuizSession, Answer,
-    Participant, SessionStatus, TabSwitchLog, Qualification, QualificationStatus
+    Participant, SessionStatus, TabSwitchLog, Qualification, QualificationStatus, RoundStatus
 )
 from app.schemas import (
     RoundCreate,
@@ -24,6 +24,36 @@ from app.schemas import (
 )
 import random
 from app.security import require_admin, get_current_user, get_current_user_optional
+
+def compute_effective_round_status(round_obj: Round) -> RoundStatus:
+    """
+    Menghitung status efektif sebuah babak secara dinamis berdasarkan 
+    start_date, start_time, end_date, dan end_time, alih-alih membaca
+    langsung dari kolom 'status' di database.
+    """
+    now = datetime.now(timezone.utc)
+    
+    # Gunakan default value jika None untuk mencegah error parse
+    s_date = round_obj.start_date or "2026-08-01"
+    s_time = round_obj.start_time or "08:00"
+    e_date = round_obj.end_date or "2026-08-10"
+    e_time = round_obj.end_time or "18:00"
+    
+    try:
+        # Asumsikan jadwal babak disetel dalam waktu lokal WIB (UTC+7)
+        wib_tz = timezone(timedelta(hours=7))
+        start_dt = datetime.strptime(f"{s_date} {s_time}", "%Y-%m-%d %H:%M").replace(tzinfo=wib_tz)
+        end_dt = datetime.strptime(f"{e_date} {e_time}", "%Y-%m-%d %H:%M").replace(tzinfo=wib_tz)
+        
+        if now < start_dt:
+            return RoundStatus.belum_dibuka
+        elif now > end_dt:
+            return RoundStatus.ditutup
+        else:
+            return RoundStatus.aktif
+    except Exception:
+        # Fallback if date parsing fails
+        return round_obj.status
 
 router = APIRouter(prefix="/rounds", tags=["Rounds & Questions"])
 
@@ -44,6 +74,9 @@ def get_rounds(
     if category:
         query = query.filter(Round.category == category)
     rounds = query.order_by(Round.category, Round.order_index, Round.created_at).all()
+    # Override status with dynamically computed effective status
+    for r in rounds:
+        r.status = compute_effective_round_status(r)
     return rounds
 
 
@@ -120,9 +153,9 @@ def get_leaderboard(
 
     for idx, item in enumerate(leaderboard):
         item["rank"] = idx + 1
-        # Jika belum ada record Qualification di DB, tentukan status bawaan: Top 10 = qualified, sisanya pending
+        # Jika belum ada record Qualification di DB, set ke pending
         if item["status"] is None:
-            item["status"] = "qualified" if idx < 10 else "pending"
+            item["status"] = "pending"
 
     return leaderboard
 
@@ -131,7 +164,8 @@ def get_leaderboard(
 def get_participant_detail_admin(
     participant_id: str,
     round_id: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin)
 ):
     """[Admin] Mendapatkan detail peserta, profil lengkap, status sesi per babak, dan submission breakdown soal (benar/salah)."""
     participant = None
@@ -436,9 +470,10 @@ def delete_round(
 @router.get("/{round_id}/questions", response_model=List[QuestionOut])
 def get_round_questions(
     round_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin)
 ):
-    """Mendapatkan seluruh daftar soal pada suatu babak."""
+    """[Admin] Mendapatkan seluruh daftar soal pada suatu babak."""
     target_round = db.query(Round).filter(Round.id == round_id).first()
     if not target_round:
         raise HTTPException(
@@ -546,8 +581,8 @@ def get_round_questions_for_student(
         ).first()
 
         if session and session.question_order:
-            order_map = {q_id: idx for idx, q_id in enumerate(session.question_order)}
-            questions.sort(key=lambda q: order_map.get(q.id, 9999))
+            order_map = {str(q_id): idx for idx, q_id in enumerate(session.question_order)}
+            questions.sort(key=lambda q: order_map.get(str(q.id), 9999))
 
     out = [
         QuestionStudentOut(
@@ -573,6 +608,12 @@ def start_quiz_session(
     target_round = db.query(Round).filter(Round.id == round_id).first()
     if not target_round:
         raise HTTPException(status_code=404, detail="Babak tidak ditemukan.")
+        
+    eff_status = compute_effective_round_status(target_round)
+    if eff_status == RoundStatus.belum_dibuka:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Babak belum dibuka.")
+    if eff_status == RoundStatus.ditutup:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Babak sudah ditutup.")
     
     participant = db.query(Participant).filter(Participant.user_id == current_user.id).first()
     participant_id = participant.id if participant else current_user.id

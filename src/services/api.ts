@@ -436,7 +436,9 @@ class ApiService {
   // ---------- Questions API ----------
 
   async getRoundQuestions(roundId: string): Promise<QuestionData[]> {
-    const res = await fetch(`${API_BASE_URL}/rounds/${roundId}/questions`);
+    const res = await fetch(`${API_BASE_URL}/rounds/${roundId}/questions`, {
+      headers: this.getAuthHeaders(),
+    });
     if (!res.ok) throw new Error('Gagal mengambil bank soal babak.');
     return res.json();
   }
