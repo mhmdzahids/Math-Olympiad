@@ -4,7 +4,8 @@ export type ScreenView =
   | 'student-dashboard' 
   | 'quiz' 
   | 'admin-rounds' 
-  | 'admin-leaderboard';
+  | 'admin-leaderboard'
+  | 'admin-participant-detail';
 
 export interface Question {
   id: number;
@@ -60,4 +61,47 @@ export interface ParsedQuestion {
   isError?: boolean;
   errorMessage?: string;
   imageUrl?: string;
+}
+
+export interface QuestionSubmissionBreakdown {
+  number: number;
+  question_id: string;
+  question_text: string;
+  image_url?: string;
+  options: Record<string, string> | { key: string; text: string }[];
+  submitted_answer: string | null;
+  correct_answer: string;
+  is_correct: boolean;
+  status: 'correct' | 'incorrect' | 'unanswered';
+}
+
+export interface RoundSessionSummary {
+  round_id: string;
+  round_name: string;
+  order_index: number;
+  mode: 'online' | 'offline';
+  qualification_status: 'qualified' | 'disqualified' | 'pending';
+  has_session: boolean;
+  score: number;
+  tab_switches: number;
+  tab_switch_limit: number;
+  is_safe: boolean;
+  session_status: string;
+  started_at?: string | null;
+  submitted_at?: string | null;
+}
+
+export interface ParticipantDetailData {
+  participant: {
+    id: string;
+    full_name: string;
+    school_name: string;
+    grade: string;
+    category: string;
+    email: string;
+    phone: string;
+  };
+  selected_round_id: string | null;
+  rounds_summary: RoundSessionSummary[];
+  submission_breakdown: QuestionSubmissionBreakdown[];
 }

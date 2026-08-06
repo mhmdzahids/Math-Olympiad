@@ -8,6 +8,7 @@ import { StudentDashboard } from './components/StudentDashboard';
 import { QuizExecutionView } from './components/QuizExecutionView';
 import { AdminRoundManagerView } from './components/AdminRoundManagerView';
 import { AdminLeaderboardView } from './components/AdminLeaderboardView';
+import { AdminParticipantDetailView } from './components/AdminParticipantDetailView';
 import { Footer } from './components/Footer';
 import { apiService, UserOut } from './services/api';
 import { ToastContainer, ToastMessage } from './components/Toast';
@@ -22,6 +23,7 @@ export default function App() {
   const [rounds, setRounds] = useState<CompetitionRound[]>(INITIAL_ROUNDS);
   const [activeQuizRound, setActiveQuizRound] = useState<CompetitionRound | null>(null);
   const [isAdminEditingRounds, setIsAdminEditingRounds] = useState<boolean>(false);
+  const [selectedParticipantId, setSelectedParticipantId] = useState<string | null>(null);
   const [highlightSaveTrigger, setHighlightSaveTrigger] = useState<number>(0);
   const [authModal, setAuthModal] = useState<'login' | 'register' | null>(null);
   const [authEmail, setAuthEmail] = useState('');
@@ -57,6 +59,41 @@ export default function App() {
 
   const [pendingNav, setPendingNav] = useState<{ screen: ScreenView; tab?: 'register' | 'login' } | null>(null);
 
+  const loadRoundsFromDb = async () => {
+    try {
+      const dbRounds = await apiService.getRounds();
+      if (dbRounds && dbRounds.length > 0) {
+        const mapped: CompetitionRound[] = dbRounds.map((r) => ({
+          id: r.id,
+          title: r.name,
+          category: r.category.toUpperCase() as 'SD' | 'SMP' | 'SMA',
+          questionCount: r.question_count ?? (r.category === 'sma' ? 30 : 25),
+          durationMinutes: r.duration_minutes,
+          tabSwitchLimit: r.tab_switch_limit,
+          isRandomized: r.is_randomized ?? true,
+          status: (() => {
+            if (r.status === 'aktif') return 'active';
+            if (r.status === 'belum_dibuka' || r.status === 'draft') return 'upcoming';
+            return 'completed';
+          })(),
+          executionMode: r.mode,
+          isOfflineStarted: r.is_offline_started,
+          startDate: r.start_date,
+          startTime: r.start_time,
+          endDate: r.end_date,
+          endTime: r.end_time,
+        }));
+        setRounds(mapped);
+        const topSd = mapped.find((r) => r.category === 'SD') || mapped[0];
+        if (topSd) {
+          setSelectedRound(topSd.title);
+        }
+      }
+    } catch (err) {
+      console.warn('Fallback to local rounds:', err);
+    }
+  };
+
   useEffect(() => {
     async function checkSession() {
       const token = apiService.getToken();
@@ -78,47 +115,6 @@ export default function App() {
       }
     }
 
-    async function loadRoundsFromDb() {
-      try {
-        const dbRounds = await apiService.getRounds();
-        if (dbRounds && dbRounds.length > 0) {
-          const mapped: CompetitionRound[] = dbRounds.map((r) => ({
-            id: r.id,
-            title: r.name,
-            category: r.category.toUpperCase() as 'SD' | 'SMP' | 'SMA',
-            questionCount: r.question_count ?? (r.category === 'sma' ? 30 : 25),
-            durationMinutes: r.duration_minutes,
-            tabSwitchLimit: r.tab_switch_limit,
-            isRandomized: r.is_randomized ?? true,
-            status: (() => {
-              if (r.status === 'draft' || r.status === 'belum_dibuka') return 'upcoming';
-              if (r.end_date) {
-                const eDate = r.end_date;
-                const eTime = r.end_time || '18:00';
-                const endDt = new Date(`${eDate}T${eTime}:00`);
-                if (new Date() > endDt) return 'completed';
-                return 'active';
-              }
-              return r.status === 'aktif' ? 'active' : 'completed';
-            })(),
-            executionMode: r.mode,
-            isOfflineStarted: r.is_offline_started,
-            startDate: r.start_date,
-            startTime: r.start_time,
-            endDate: r.end_date,
-            endTime: r.end_time,
-          }));
-          setRounds(mapped);
-          const topSd = mapped.find((r) => r.category === 'SD') || mapped[0];
-          if (topSd) {
-            setSelectedRound(topSd.title);
-          }
-        }
-      } catch (err) {
-        console.warn('Fallback to local rounds:', err);
-      }
-    }
-
     checkSession();
     loadRoundsFromDb();
   }, []);
@@ -126,6 +122,7 @@ export default function App() {
   const handleLoginSuccess = (user: UserOut) => {
     setCurrentUser(user);
     setIsLoggedIn(true);
+    loadRoundsFromDb();
     if (user.role === 'admin') {
       setCurrentScreen('admin-leaderboard');
     } else {
@@ -375,7 +372,22 @@ export default function App() {
         )}
 
         {currentScreen === 'admin-leaderboard' && (
-          <AdminLeaderboardView onNavigate={handleNavigate} onShowToast={showToast} />
+          <AdminLeaderboardView
+            onNavigate={handleNavigate}
+            onSelectParticipant={(participantId) => {
+              setSelectedParticipantId(participantId);
+              handleNavigate('admin-participant-detail');
+            }}
+            onShowToast={showToast}
+          />
+        )}
+
+        {currentScreen === 'admin-participant-detail' && (
+          <AdminParticipantDetailView
+            participantId={selectedParticipantId || 'demo-participant-id'}
+            onNavigate={handleNavigate}
+            onShowToast={showToast}
+          />
         )}
       </div>
 
