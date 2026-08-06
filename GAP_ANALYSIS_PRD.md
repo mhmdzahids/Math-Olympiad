@@ -10,8 +10,8 @@
 
 | Kategori | Jumlah Fitur | Persentase | Status |
 |---|:---:|:---:|---|
-| **Aligned (Sesuai PRD)** | 10 Modul Utama | ~93% | Berjalan Sangat Baik & Teruji |
-| **Gaps / Not Aligned** | 3 Catatan Fitur | ~7% | Perlu Pengembangan Lanjutan |
+| **Aligned (Sesuai PRD)** | 10 Modul Utama | ~95% | Berjalan Sangat Baik & Teruji |
+| **Gaps / Not Aligned** | 3 Catatan Fitur | ~5% | Perlu Pengembangan Lanjutan |
 
 Secara keseluruhan, alur utama aplikasi (*Core User Flow*) meliputi pendaftaran, pengacakan soal unik per peserta, penanganan formula matematika LaTeX (KaTeX), manajemen babak dinamis dengan **drag-and-drop reordering**, sinkronisasi status babak real-time berbasis tanggal, navigasi protektif peran admin/peserta, serta dashboard kualifikasi admin telah berjalan dengan sangat baik dan selaras dengan spesifikasi PRD.
 
@@ -25,9 +25,9 @@ Secara keseluruhan, alur utama aplikasi (*Core User Flow*) meliputi pendaftaran,
 - **Auto-Labeling "Final"**: Babak yang berada di urutan posisi paling akhir secara otomatis berlabel **"Final"**, dan berpindah jika urutan babak diubah.
 
 ### 2.2 Synchronized Round Status & Date Schedule (FR-P2, FR-A2)
-- **Evaluasi Dinamis Real-Time**: Status babak (`Aktif`, `Ditutup / Waktu Habis`, `Belum Dimulai`) dievaluasi secara dinamis berdasarkan perbandingan tanggal/jam (`startDate` & `endDate`) terhadap waktu saat ini (`now`).
+- **Evaluasi Dinamis Real-Time**: Status babak (`Aktif`, `Ditutup / Waktu Habis`, `Belum Dimulai`) kini dievaluasi secara murni terpusat di Backend (UTC+7) tanpa berpatokan pada *field* teks statis, memastikan keakuratan waktu sampai level detik.
 - **Konsistensi Lintas Komponen**: Status babak di Manajer Babak, Dashboard Klasemen Admin, dan Dashboard Siswa tersinkronisasi 100% tanpa perbedaan data.
-- **Update Database Otomatis**: Pengubahan `endDate` oleh Admin di Manajer Babak langsung memperbarui kolom `status` di database PostgreSQL.
+- **Proteksi API Tingkat Lanjut**: Endpoint `quiz/start` menerapkan *Time-Based Access Control* (HTTP 403 Forbidden) yang secara mutlak menolak upaya bypass peserta sebelum/sesudah jam ujian.
 
 ### 2.3 Navigasi Berbasis Peran & Akses Dashboard (FR-A1, FR-P1)
 - **Role-Based Navigation**: Klik tombol *"Buka Dashboard"* di Landing Page secara cerdas mengarahkan pengguna sesuai perannya:
@@ -42,7 +42,7 @@ Secara keseluruhan, alur utama aplikasi (*Core User Flow*) meliputi pendaftaran,
 
 ### 2.5 Pengacakan Urutan Soal per Peserta (FR-A10 & Data Model v1.3)
 - **Terimplementasi Penuh**: Jika opsi "Acak Urutan Soal per Peserta" diaktifkan oleh admin (`is_randomized = True`), backend secara otomatis melakukan *random shuffle* unik per `QuizSession` peserta dan menguncinya di tabel `quiz_sessions.question_order`.
-- **Konsistensi Ujian**: Setiap peserta mendapatkan urutan soal yang berbeda-beda satu sama lain, namun urutan soal milik peserta tersebut tetap konsisten jika peramban di-refresh atau kuis dilanjutkan.
+- **Konsistensi Ujian (Fixed)**: Setiap peserta mendapatkan urutan soal yang berbeda-beda satu sama lain berkat integrasi pemetaan *UUID-to-String* yang akurat, sehingga urutan soal peserta tetap konsisten meskipun *browser* di-*refresh*.
 
 ### 2.6 Notasi Matematika LaTeX (FR-A9 / Upgrade v1.3)
 - Engine KaTeX digunakan untuk merender notasi matematika kompleks seperti pecahan, bentuk akar, limit, eksponen, matriks, dan simbol pi secara sempurna pada soal dan pilihan jawaban via komponen `<MathText />`.
@@ -77,5 +77,5 @@ Secara keseluruhan, alur utama aplikasi (*Core User Flow*) meliputi pendaftaran,
 
 ## 4. Kesimpulan & Status Akhir
 
-1. **Tingkat Keselarasan Platform**: **~93%** selaras dengan PRD v1.3.
+1. **Tingkat Keselarasan Platform**: **~95%** selaras dengan PRD v1.3.
 2. **Kesiapan Sistem**: Seluruh fitur operasional utama (pengacakan soal, anti-cheat, manajemen babak drag & drop, status jadwal dinamis, navigasi peran) telah berfungsi dengan stabil dan siap digunakan untuk pelaksanaan lomba matematika online/offline.

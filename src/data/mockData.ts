@@ -1,10 +1,10 @@
 import { Question, CompetitionRound, Participant, ParsedQuestion } from '../types';
-import logoSvg from '../assets/logo.svg';
+import logoPng from '../assets/logo_optima.png';
 import bannerPng from '../assets/banner.png';
 import banner2Png from '../assets/banner_2.png';
 
 export const ASSET_IMAGES = {
-  logo: logoSvg,
+  logo: logoPng,
   competitionBanner: bannerPng,
   landingBanner: banner2Png,
   cylinderSphere: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAFahvhCGyxgugBkn6v5JolJhEcOkaXjMuI7trdK-EiytLJGEV1PBMO7IU-h0btYvDPKHuSz8kFLbEWImsm7Qh750buvkkafPofGI3jMO7GRIwGjKtxnZZqhkX1gS2LixcdatkeWnDcxDzLUPcHi6mnhD8rGZrhKdEyC-mLV8Evzsw9O0DwymeQAq1c7y-2qUJ6dr9fCjFdBpV271gjzeNu0UPVUGMzVpKJowklYRqj_T31ePTf8GfhrQ',

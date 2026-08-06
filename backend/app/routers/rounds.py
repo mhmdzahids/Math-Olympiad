@@ -816,3 +816,49 @@ def submit_quiz_answers(
         "tab_switch_count": session.tab_switch_count
     }
 
+
+@router.delete("/admin/participants/{participant_id}/rounds/{round_id}/session")
+def reset_participant_session(
+    participant_id: str,
+    round_id: str,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin)
+):
+    """
+    [Admin] Reset sesi kuis peserta untuk babak tertentu (FR-A8).
+    Menghapus jawaban, log tab switch, dan riwayat sesi kuis agar bisa dikerjakan ulang.
+    """
+    # Cari sesi
+    session = db.query(QuizSession).filter(
+        QuizSession.participant_id == participant_id,
+        QuizSession.round_id == round_id
+    ).first()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Sesi kuis tidak ditemukan untuk peserta dan babak ini.")
+
+    try:
+        from app.models import Answer, TabSwitchLog, Qualification
+        
+        # 1. Hapus semua jawaban terkait sesi ini
+        db.query(Answer).filter(Answer.session_id == session.id).delete(synchronize_session=False)
+        
+        # 2. Hapus semua log pelanggaran tab switch
+        db.query(TabSwitchLog).filter(TabSwitchLog.session_id == session.id).delete(synchronize_session=False)
+        
+        # 3. Hapus status kualifikasinya (jika ada) agar kembali ke status pending murni
+        db.query(Qualification).filter(
+            Qualification.participant_id == participant_id,
+            Qualification.round_id == round_id
+        ).delete(synchronize_session=False)
+
+        # 4. Hapus sesinya itu sendiri
+        db.delete(session)
+        
+        # Commit seluruh perubahan
+        db.commit()
+        return {"status": "success", "message": "Sesi ujian peserta telah direset sepenuhnya."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Gagal mereset sesi kuis: {str(e)}")
+

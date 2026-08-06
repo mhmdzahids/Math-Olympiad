@@ -244,6 +244,18 @@ class ApiService {
     return res.json();
   }
 
+  async resetParticipantSession(participantId: string, roundId: string): Promise<{ status: string; message: string }> {
+    const res = await fetch(`${API_BASE_URL}/rounds/admin/participants/${participantId}/rounds/${roundId}/session`, {
+      method: 'DELETE',
+      headers: this.getAuthHeaders(),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Gagal mereset sesi kuis peserta.');
+    }
+    return res.json();
+  }
+
   async getParticipantDetail(participantId: string, roundId?: string): Promise<ParticipantDetailData> {
     try {
       const url = roundId
