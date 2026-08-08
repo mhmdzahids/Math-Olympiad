@@ -25,6 +25,11 @@ class Settings:
     CORS_ORIGINS: list[str] = os.getenv(
         "CORS_ORIGINS", "http://localhost:5173"
     ).split(",")
+    
+    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "production")
 
 
 settings = Settings()
+
+if settings.ENVIRONMENT != "development" and (not os.getenv("JWT_SECRET_KEY") or settings.JWT_SECRET_KEY == "ganti-ini-sebelum-deploy"):
+    raise Exception("JWT_SECRET_KEY belum diatur atau masih nilai default. Set environment variable ini sebelum menjalankan aplikasi.")

@@ -487,6 +487,7 @@ def get_round_questions(
             id=q.id,
             round_id=q.round_id,
             question_text=q.question_text,
+            question_type=q.question_type or "PG",
             options=q.options,
             correct_key=q.correct_answer,
             image_url=q.image_url,
@@ -497,6 +498,12 @@ def get_round_questions(
     ]
     return out
 
+
+def sanitize_win1252(text: str | None) -> str | None:
+    if not text:
+        return text
+    # Map common math unicode characters that fail in Windows CP1252 PostgreSQL databases
+    return text.replace('\u2212', '-').replace('\u2264', '<=').replace('\u2265', '>=').replace('\u2260', '!=')
 
 @router.post("/{round_id}/questions/import", status_code=status.HTTP_201_CREATED)
 def import_questions_to_round(
@@ -514,20 +521,31 @@ def import_questions_to_round(
         )
 
     if payload.mode == "replace":
-        db.query(Question).filter(Question.round_id == round_id).delete()
+        from app.models import Answer
+        question_ids = [q_id for (q_id,) in db.query(Question.id).filter(Question.round_id == round_id).all()]
+        if question_ids:
+            db.query(Answer).filter(Answer.question_id.in_(question_ids)).delete(synchronize_session=False)
+        db.query(Question).filter(Question.round_id == round_id).delete(synchronize_session=False)
         existing_count = 0
     else:
         existing_count = db.query(Question).filter(Question.round_id == round_id).count()
 
     created_questions = []
     for idx, q_data in enumerate(payload.questions):
-        opts = [o.dict() for o in q_data.options]
+        # Sanitize options
+        opts = []
+        if q_data.options:
+            opts = [{"key": o.key, "text": sanitize_win1252(o.text)} for o in q_data.options]
+        
+        q_type = q_data.question_type if hasattr(q_data, "question_type") and q_data.question_type else ("PG" if opts else "ISIAN")
+        
         q_obj = Question(
             round_id=round_id,
             category=target_round.category,
-            question_text=q_data.question_text,
-            options=opts,
-            correct_answer=q_data.correct_key,
+            question_text=sanitize_win1252(q_data.question_text),
+            question_type=q_type,
+            options=opts if q_type == "PG" else None,
+            correct_answer=sanitize_win1252(q_data.correct_key),
             image_url=q_data.image_url,
             order_index=existing_count + idx + 1,
         )
@@ -589,6 +607,7 @@ def get_round_questions_for_student(
             id=q.id,
             round_id=q.round_id,
             question_text=q.question_text,
+            question_type=q.question_type or "PG",
             options=q.options,
             image_url=q.image_url,
             points=10,
@@ -622,6 +641,13 @@ def start_quiz_session(
         QuizSession.participant_id == participant_id,
         QuizSession.round_id == round_id
     ).first()
+
+    # Cek apakah akun peserta sudah diaktivasi oleh admin
+    if participant and not getattr(participant, 'is_active', True):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Akun Anda belum diaktivasi oleh admin. Silakan hubungi panitia OPTIMA."
+        )
 
     now = datetime.now(timezone.utc)
     if session and session.status != SessionStatus.in_progress:
@@ -770,17 +796,30 @@ def submit_quiz_answers(
         session.status = SessionStatus.force_ended_timeout
 
     # Server-Side Scoring
+    target_round = db.query(Round).filter(Round.id == round_id).first()
+    category = target_round.category if target_round else Category.sd
     questions = db.query(Question).filter(Question.round_id == round_id).all()
     score = 0
-    total_points = len(questions) * 10 if questions else 100
+    total_points = 0
 
     if questions:
         for idx, q in enumerate(questions):
             key_id = str(idx + 1)
-            submitted_ans = payload.answers.get(key_id) or payload.answers.get(q.id)
+            submitted_ans = payload.answers.get(key_id) or payload.answers.get(str(q.id))
+            
+            # Hitung Max Points
+            if category in (Category.sd, Category.smp):
+                total_points += 4
+            else: # SMA
+                if q.question_type == "ISIAN":
+                    total_points += 5
+                else:
+                    total_points += 3
 
-            if submitted_ans is not None:
-                clean_ans = str(submitted_ans).upper().strip()
+            clean_ans = str(submitted_ans).upper().strip() if submitted_ans else None
+            
+            # Save answer to DB
+            if clean_ans is not None:
                 existing_ans = db.query(Answer).filter(
                     Answer.session_id == session.id,
                     Answer.question_id == q.id
@@ -798,8 +837,27 @@ def submit_quiz_answers(
                     )
                     db.add(new_ans)
 
-            if submitted_ans and str(submitted_ans).upper().strip() == str(q.correct_answer).upper().strip():
-                score += 10
+            # Hitung Skor Aktual
+            is_correct = False
+            if clean_ans:
+                # Untuk soal ISIAN, kita hapus spasi berlebih untuk perbandingan
+                if q.question_type == "ISIAN":
+                    clean_ans_normalized = " ".join(clean_ans.split())
+                    correct_ans_normalized = " ".join(str(q.correct_answer).upper().strip().split())
+                    is_correct = (clean_ans_normalized == correct_ans_normalized)
+                else:
+                    is_correct = (clean_ans == str(q.correct_answer).upper().strip())
+
+            if category in (Category.sd, Category.smp):
+                if clean_ans:
+                    score += 4 if is_correct else -1
+            else: # SMA
+                if q.question_type == "ISIAN":
+                    if clean_ans:
+                        score += 5 if is_correct else 0
+                else: # SMA PG
+                    if clean_ans:
+                        score += 3 if is_correct else -1
 
     session.score = score
     if session.status == SessionStatus.in_progress:
@@ -862,3 +920,171 @@ def reset_participant_session(
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Gagal mereset sesi kuis: {str(e)}")
 
+# ─────────────────────────────────────────────────────────────
+# ADMIN: Kelola Akun Peserta
+# ─────────────────────────────────────────────────────────────
+
+class ParticipantProfileUpdate(BaseModel):
+    full_name: Optional[str] = None
+    school_name: Optional[str] = None
+    grade: Optional[str] = None
+    phone: Optional[str] = None
+    category: Optional[str] = None
+
+
+@router.get("/admin/accounts")
+def get_all_participant_accounts(
+    category: Optional[str] = None,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin)
+):
+    """[Admin] Mendapatkan seluruh akun peserta dengan info aktivasi."""
+    query = db.query(Participant)
+    if category:
+        try:
+            cat_enum = Category(category.lower())
+            query = query.filter(Participant.category == cat_enum)
+        except ValueError:
+            pass
+    participants = query.order_by(Participant.created_at.desc()).all()
+
+    result = []
+    for p in participants:
+        user = db.query(User).filter(User.id == p.user_id).first()
+        result.append({
+            "id": str(p.id),
+            "user_id": str(p.user_id),
+            "email": user.email if user else "",
+            "full_name": p.full_name,
+            "school_name": p.school_name,
+            "category": p.category.value if hasattr(p.category, "value") else str(p.category),
+            "grade": p.grade,
+            "phone": p.phone,
+            "is_active": getattr(p, 'is_active', False),
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+        })
+    return result
+
+
+@router.patch("/admin/accounts/{participant_id}/activate")
+def activate_participant_account(
+    participant_id: str,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin)
+):
+    """[Admin] Mengaktifkan akun peserta agar dapat mulai kuis."""
+    p = db.query(Participant).filter(Participant.id == participant_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Peserta tidak ditemukan.")
+    p.is_active = True
+    db.commit()
+    return {"status": "success", "message": f"Akun {p.full_name} berhasil diaktivasi."}
+
+
+@router.patch("/admin/accounts/{participant_id}/deactivate")
+def deactivate_participant_account(
+    participant_id: str,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin)
+):
+    """[Admin] Menonaktifkan akun peserta."""
+    p = db.query(Participant).filter(Participant.id == participant_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Peserta tidak ditemukan.")
+    p.is_active = False
+    db.commit()
+    return {"status": "success", "message": f"Akun {p.full_name} berhasil dinonaktifkan."}
+
+
+@router.put("/admin/accounts/{participant_id}")
+def update_participant_profile(
+    participant_id: str,
+    payload: ParticipantProfileUpdate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin)
+):
+    """[Admin] Mengupdate profil peserta."""
+    p = db.query(Participant).filter(Participant.id == participant_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Peserta tidak ditemukan.")
+    if payload.full_name is not None:
+        p.full_name = payload.full_name
+    if payload.school_name is not None:
+        p.school_name = payload.school_name
+    if payload.grade is not None:
+        p.grade = payload.grade
+    if payload.phone is not None:
+        p.phone = payload.phone
+    if payload.category is not None:
+        try:
+            p.category = Category(payload.category.lower())
+        except ValueError:
+            pass
+    db.commit()
+    db.refresh(p)
+    return {"status": "success", "message": f"Profil {p.full_name} berhasil diperbarui."}
+
+
+@router.delete("/admin/accounts/{participant_id}")
+def delete_participant_account(
+    participant_id: str,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin)
+):
+    """[Admin] Menghapus akun peserta beserta semua data terkait."""
+    p = db.query(Participant).filter(Participant.id == participant_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Peserta tidak ditemukan.")
+
+    user_id = p.user_id
+    name = p.full_name
+
+    try:
+        # 1. Hapus semua Answer milik sesi peserta ini
+        sessions = db.query(QuizSession).filter(QuizSession.participant_id == p.id).all()
+        for sess in sessions:
+            db.query(Answer).filter(Answer.session_id == sess.id).delete(synchronize_session=False)
+            db.query(TabSwitchLog).filter(TabSwitchLog.session_id == sess.id).delete(synchronize_session=False)
+        # 2. Hapus semua sesi kuis
+        db.query(QuizSession).filter(QuizSession.participant_id == p.id).delete(synchronize_session=False)
+        # 3. Hapus kualifikasi
+        db.query(Qualification).filter(Qualification.participant_id == p.id).delete(synchronize_session=False)
+        # 4. Hapus participant record
+        db.delete(p)
+        # 5. Hapus user account
+        user = db.query(User).filter(User.id == user_id).first()
+        if user:
+            db.delete(user)
+        db.commit()
+        return {"status": "success", "message": f"Akun {name} berhasil dihapus."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Gagal menghapus akun: {str(e)}")
+
+
+# ─────────────────────────────────────────────────────────────
+# STUDENT: Cek status aktivasi akun sendiri
+# ─────────────────────────────────────────────────────────────
+
+@router.get("/my/activation-status")
+def get_my_activation_status(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """[Peserta] Mendapatkan status aktivasi akun sendiri."""
+    participant = db.query(Participant).filter(Participant.user_id == current_user.id).first()
+    if not participant:
+        raise HTTPException(status_code=404, detail="Data peserta tidak ditemukan.")
+    
+    # Cek apakah ada kualifikasi lolos di babak manapun
+    has_passed_any_round = db.query(Qualification).filter(
+        Qualification.participant_id == participant.id,
+        Qualification.status == QualificationStatus.lolos
+    ).first() is not None
+
+    return {
+        "is_active": getattr(participant, 'is_active', False),
+        "has_passed_any_round": has_passed_any_round,
+        "participant_id": str(participant.id),
+        "full_name": participant.full_name,
+    }

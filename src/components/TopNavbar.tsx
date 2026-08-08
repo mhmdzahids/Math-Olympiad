@@ -279,6 +279,16 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
               >
                 Kelola Babak
               </button>
+              <button
+                onClick={() => onNavigate('admin-accounts')}
+                className={`font-semibold text-sm transition-all pb-0.5 ${
+                  currentScreen === 'admin-accounts'
+                    ? 'text-[#0a0a0a] border-b-2 border-[#0a0a0a]'
+                    : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
+                }`}
+              >
+                Kelola Akun
+              </button>
             </>
           ) : (
             <>
@@ -425,6 +435,18 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
                   >
                     <span className="material-symbols-outlined text-base">tune</span>
                     <span>Kelola Babak</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setProfileDropdownOpen(false);
+                      onNavigate('admin-accounts');
+                    }}
+                    className={`md:hidden w-full text-left px-4 py-2 text-xs font-semibold flex items-center gap-2 transition-colors ${
+                      currentScreen === 'admin-accounts' ? 'bg-[#f5f0e0] text-[#0a0a0a] font-bold' : 'text-[#6a6a6a] hover:bg-[#f5f0e0] hover:text-[#0a0a0a]'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-base">manage_accounts</span>
+                    <span>Kelola Akun</span>
                   </button>
                   <hr className="my-1 border-[#0a0a0a]/10 md:hidden" />
                   <button

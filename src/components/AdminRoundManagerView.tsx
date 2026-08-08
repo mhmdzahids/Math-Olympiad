@@ -333,6 +333,7 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
   // Edit / Add Question Modal states
   const [editingQuestion, setEditingQuestion] = useState<ParsedQuestion | null>(null);
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
+  const [newQuestionType, setNewQuestionType] = useState<'PG' | 'ISIAN'>('PG');
   const [newQuestionText, setNewQuestionText] = useState('');
   const [newImageUrl, setNewImageUrl] = useState<string>('');
   const [newOptions, setNewOptions] = useState<{ key: string; text: string }[]>([
@@ -579,8 +580,10 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
   };
 
   const resetAddModal = () => {
+    setShowAddModal(false);
     setNewQuestionText('');
     setNewImageUrl('');
+    setNewQuestionType('PG');
     setNewOptions([
       { key: 'A', text: '' },
       { key: 'B', text: '' },
@@ -588,7 +591,6 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
       { key: 'D', text: '' }
     ]);
     setNewKey('A');
-    setShowAddModal(false);
   };
 
   const handleNewImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -623,22 +625,30 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
 
   const handleAddManualQuestion = () => {
     if (!newQuestionText.trim()) return;
-    const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
-    const formattedOpts = newOptions.map((opt, i) => ({
-      key: letters[i] || `P${i + 1}`,
-      text: opt.text.trim() || `Pilihan ${letters[i] || i + 1}`
-    }));
-    const validKeys = formattedOpts.map((o) => o.key);
-    const finalKey = validKeys.includes(newKey) ? newKey : (formattedOpts[0]?.key || 'A');
+    
+    let formattedOpts: { key: string; text: string }[] | undefined = undefined;
+    let finalKey = newKey;
+
+    if (newQuestionType === 'PG') {
+      const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
+      formattedOpts = newOptions.map((opt, i) => ({
+        key: letters[i] || `P${i + 1}`,
+        text: opt.text.trim() || `Pilihan ${letters[i] || i + 1}`
+      }));
+      const validKeys = formattedOpts.map((o) => o.key);
+      finalKey = validKeys.includes(newKey) ? newKey : (formattedOpts[0]?.key || 'A');
+    }
 
     const newQ: ParsedQuestion = {
       id: `Q0${parsedQuestions.length + 1}`,
       questionText: newQuestionText,
+      questionType: newQuestionType,
       options: formattedOpts,
       key: finalKey,
       isError: false,
-      imageUrl: newImageUrl.trim() || undefined
+      imageUrl: newImageUrl || undefined
     };
+
     setParsedQuestions([...parsedQuestions, newQ]);
     resetAddModal();
   };
@@ -1346,6 +1356,38 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                                   </div>
                                 </div>
                               )}
+
+
+                              {/* Randomize Toggle (Hanya Muncul jika Kuis Online) */}
+                              {!isOffline && (
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-bold text-[#6a6a6a] uppercase tracking-wider">
+                                    ACAK SOAL
+                                  </label>
+                                  <div className={`flex items-center gap-2 border border-[#0a0a0a]/20 px-3 py-2 rounded-xl bg-[#fffaf0] ${!isEditingSettings ? 'opacity-60' : ''}`}>
+                                    <span className="material-symbols-outlined text-[#6a6a6a] text-[20px]">
+                                      shuffle
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        ensureEditMode();
+                                        handleToggleRandomize(round.id);
+                                      }}
+                                      disabled={!isEditingSettings}
+                                      className={`w-10 h-5 rounded-full relative flex items-center px-0.5 transition-colors ${
+                                        (round.isRandomized ?? true) ? 'bg-[#0a0a0a]' : 'bg-[#c4c7c7]'
+                                      } ${!isEditingSettings ? 'cursor-not-allowed' : ''}`}
+                                    >
+                                      <div
+                                        className={`w-4 h-4 bg-white rounded-full transition-transform ${
+                                          (round.isRandomized ?? true) ? 'translate-x-5' : 'translate-x-0'
+                                        }`}
+                                      />
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
                             </div>
 
                             {/* Bottom Action Bar: Delete Round Button (only in edit mode) */}
@@ -1425,29 +1467,6 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                     </div>
                   </div>
 
-                  {!isSelectedRoundOffline && (
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="text-xs sm:text-sm text-[#0a0a0a] font-bold">
-                        Acak Urutan Soal per Peserta
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          handleToggleRandomize(expandedRoundId);
-                          setRandomizeOrder(!randomizeOrder);
-                        }}
-                        className={`w-12 h-6 rounded-full relative flex items-center px-1 transition-colors ${
-                          (currentRounds.find(r => r.id === expandedRoundId)?.isRandomized ?? randomizeOrder) ? 'bg-[#0a0a0a]' : 'bg-[#c4c7c7]'
-                        }`}
-                      >
-                        <div
-                          className={`w-4 h-4 bg-white rounded-full transition-transform ${
-                            (currentRounds.find(r => r.id === expandedRoundId)?.isRandomized ?? randomizeOrder) ? 'translate-x-6' : 'translate-x-0'
-                          }`}
-                        />
-                      </button>
-                    </div>
-                  )}
                 </div>
 
                 <div className="p-6 sm:p-10 space-y-4">
@@ -1587,14 +1606,20 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                               </span>
                             ) : (
                               <div className="flex gap-1.5 flex-wrap">
-                                {pq.options.map((opt) => (
-                                  <span
-                                    key={opt.key}
-                                    className="text-xs bg-[#fffaf0] px-2 py-1 rounded-lg border border-[#0a0a0a]/10 font-medium"
-                                  >
-                                    {opt.key}: <MathText text={opt.text} />
+                                {pq.questionType === 'ISIAN' ? (
+                                  <span className="text-xs bg-[#e05638]/10 text-[#e05638] px-2 py-1 rounded-lg border border-[#e05638]/30 font-bold">
+                                    [Soal Isian Singkat]
                                   </span>
-                                ))}
+                                ) : (
+                                  pq.options?.map((opt) => (
+                                    <span
+                                      key={opt.key}
+                                      className="text-xs bg-[#fffaf0] px-2 py-1 rounded-lg border border-[#0a0a0a]/10 font-medium"
+                                    >
+                                      {opt.key}: <MathText text={opt.text} />
+                                    </span>
+                                  ))
+                                )}
                               </div>
                             )}
                           </td>
@@ -1626,14 +1651,26 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                                 </button>
                               </div>
                             ) : (
-                              <button
-                                onClick={() => handleStartEdit(pq)}
-                                className="text-[#6a6a6a] hover:text-[#0a0a0a] transition-colors p-1 cursor-pointer"
-                              >
-                                <span className="material-symbols-outlined text-[20px]">
-                                  edit
-                                </span>
-                              </button>
+                              <div className="flex gap-1 justify-end">
+                                <button
+                                  onClick={() => handleStartEdit(pq)}
+                                  className="text-[#6a6a6a] hover:text-[#0a0a0a] transition-colors p-1 cursor-pointer flex items-center justify-center"
+                                  title="Ubah Soal"
+                                >
+                                  <span className="material-symbols-outlined text-[20px]">
+                                    edit
+                                  </span>
+                                </button>
+                                <button
+                                  onClick={() => handleSkipQuestion(pq.id)}
+                                  className="text-[#6a6a6a] hover:text-[#ba1a1a] transition-colors p-1 cursor-pointer flex items-center justify-center"
+                                  title="Hapus Soal"
+                                >
+                                  <span className="material-symbols-outlined text-[20px]">
+                                    delete
+                                  </span>
+                                </button>
+                              </div>
                             )}
                           </td>
                         </tr>
@@ -1743,66 +1780,102 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
               )}
             </div>
 
-            {/* Options List */}
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <label className="block text-xs font-bold uppercase text-[#6a6a6a]">Pilihan Jawaban</label>
-                <button
-                  type="button"
-                  onClick={handleAddNewOption}
-                  className="bg-[#f8f3e9] hover:bg-[#ebe6d6] text-[#0a0a0a] px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors border border-[#0a0a0a]/10 cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-sm">add</span>
-                  <span>Tambah Pilihan</span>
-                </button>
-              </div>
-
-              <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
-                {newOptions.map((opt, idx) => {
-                  const isKey = newKey === opt.key;
-                  return (
-                    <div key={idx} className="flex items-center gap-2">
-                      <span className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 border ${isKey ? 'bg-[#a4d4c5] border-[#0a0a0a] text-[#0a0a0a]' : 'bg-[#ebe6d6] border-transparent text-[#0a0a0a]'
-                        }`}>
-                        {opt.key}
-                      </span>
-                      <input
-                        type="text"
-                        value={opt.text}
-                        onChange={(e) => handleOptionTextChange(idx, e.target.value)}
-                        placeholder={`Isi pilihan ${opt.key}...`}
-                        className="flex-grow bg-[#f8f3e9] border border-[#0a0a0a]/10 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-[#0a0a0a]"
-                      />
-                      {newOptions.length > 2 && (
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteNewOption(idx)}
-                          className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg shrink-0 cursor-pointer transition-colors"
-                          title="Hapus Pilihan"
-                        >
-                          <span className="material-symbols-outlined text-base">delete</span>
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+            {/* Question Type Toggle */}
+            <div className="flex gap-2 p-1 bg-[#f8f3e9] rounded-xl border border-[#0a0a0a]/10">
+              <button
+                type="button"
+                onClick={() => setNewQuestionType('PG')}
+                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+                  newQuestionType === 'PG' ? 'bg-white shadow-sm text-[#0a0a0a]' : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
+                }`}
+              >
+                Pilihan Ganda
+              </button>
+              <button
+                type="button"
+                onClick={() => setNewQuestionType('ISIAN')}
+                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+                  newQuestionType === 'ISIAN' ? 'bg-white shadow-sm text-[#0a0a0a]' : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
+                }`}
+              >
+                Isian Singkat
+              </button>
             </div>
+
+            {/* Options List */}
+            {newQuestionType === 'PG' && (
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-xs font-bold uppercase text-[#6a6a6a]">Pilihan Jawaban</label>
+                  <button
+                    type="button"
+                    onClick={handleAddNewOption}
+                    className="bg-[#f8f3e9] hover:bg-[#ebe6d6] text-[#0a0a0a] px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors border border-[#0a0a0a]/10 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-sm">add</span>
+                    <span>Tambah Pilihan</span>
+                  </button>
+                </div>
+
+                <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                  {newOptions.map((opt, idx) => {
+                    const isKey = newKey === opt.key;
+                    return (
+                      <div key={idx} className="flex items-center gap-2">
+                        <span className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 border ${isKey ? 'bg-[#a4d4c5] border-[#0a0a0a] text-[#0a0a0a]' : 'bg-[#ebe6d6] border-transparent text-[#0a0a0a]'
+                          }`}>
+                          {opt.key}
+                        </span>
+                        <input
+                          type="text"
+                          value={opt.text}
+                          onChange={(e) => handleOptionTextChange(idx, e.target.value)}
+                          placeholder={`Isi pilihan ${opt.key}...`}
+                          className="flex-grow bg-[#f8f3e9] border border-[#0a0a0a]/10 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-[#0a0a0a]"
+                        />
+                        {newOptions.length > 2 && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteNewOption(idx)}
+                            className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg shrink-0 cursor-pointer transition-colors"
+                            title="Hapus Pilihan"
+                          >
+                            <span className="material-symbols-outlined text-base">delete</span>
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Answer Key Selection */}
             <div>
-              <label className="block text-xs font-bold uppercase text-[#6a6a6a] mb-1">Kunci Jawaban Benar</label>
-              <select
-                value={newKey}
-                onChange={(e) => setNewKey(e.target.value)}
-                className="w-full bg-[#f8f3e9] border border-[#0a0a0a]/10 rounded-xl p-2.5 text-xs font-bold text-[#0a0a0a] focus:outline-none focus:border-[#0a0a0a]"
-              >
-                {newOptions.map((opt) => (
-                  <option key={opt.key} value={opt.key}>
-                    Pilihan {opt.key} {opt.text ? `— ${opt.text}` : ''}
-                  </option>
-                ))}
-              </select>
+              <label className="block text-xs font-bold uppercase text-[#6a6a6a] mb-1">
+                {newQuestionType === 'PG' ? 'Kunci Jawaban Benar' : 'Jawaban Benar (Isian)'}
+              </label>
+              {newQuestionType === 'PG' ? (
+                <select
+                  value={newKey}
+                  onChange={(e) => setNewKey(e.target.value)}
+                  className="w-full bg-[#f8f3e9] border border-[#0a0a0a]/10 rounded-xl p-2.5 text-xs font-bold text-[#0a0a0a] focus:outline-none focus:border-[#0a0a0a]"
+                >
+                  {newOptions.map((opt) => (
+                    <option key={opt.key} value={opt.key}>
+                      Pilihan {opt.key} {opt.text ? `— ${opt.text}` : ''}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={newKey}
+                  onChange={(e) => setNewKey(e.target.value)}
+                  placeholder="Ketik jawaban isian yang benar..."
+                  className="w-full bg-[#f8f3e9] border border-[#0a0a0a]/10 rounded-xl px-3 py-2 text-sm font-bold focus:outline-none focus:border-[#0a0a0a]"
+                />
+              )}
             </div>
 
             {/* Action Buttons */}
@@ -1893,8 +1966,31 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
               )}
             </div>
 
+            {/* Question Type Toggle */}
+            <div className="flex gap-2 p-1 bg-[#f8f3e9] rounded-xl border border-[#0a0a0a]/10">
+              <button
+                type="button"
+                onClick={() => setEditingQuestion({ ...editingQuestion, questionType: 'PG', options: editingQuestion.options || [{ key: 'A', text: '' }, { key: 'B', text: '' }], isError: false })}
+                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+                  (editingQuestion.questionType || 'PG') === 'PG' ? 'bg-white shadow-sm text-[#0a0a0a]' : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
+                }`}
+              >
+                Pilihan Ganda
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditingQuestion({ ...editingQuestion, questionType: 'ISIAN', options: undefined, isError: false })}
+                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+                  editingQuestion.questionType === 'ISIAN' ? 'bg-white shadow-sm text-[#0a0a0a]' : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
+                }`}
+              >
+                Isian Singkat
+              </button>
+            </div>
+
             {/* Options List Editor */}
-            <div>
+            {(editingQuestion.questionType || 'PG') === 'PG' && (
+              <div>
               <div className="flex justify-between items-center mb-2">
                 <label className="block text-xs font-bold uppercase text-[#6a6a6a]">Pilihan Jawaban</label>
                 <button
@@ -1979,21 +2075,34 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                 })}
               </div>
             </div>
+            )}
 
             {/* Answer Key Selection */}
             <div>
-              <label className="block text-xs font-bold uppercase text-[#6a6a6a] mb-1">Kunci Jawaban Benar</label>
-              <select
-                value={editingQuestion.key}
-                onChange={(e) => setEditingQuestion({ ...editingQuestion, key: e.target.value })}
-                className="w-full bg-[#f8f3e9] border border-[#0a0a0a]/10 rounded-xl p-2.5 text-xs font-bold text-[#0a0a0a] focus:outline-none focus:border-[#0a0a0a]"
-              >
-                {(editingQuestion.options || []).map((opt) => (
-                  <option key={opt.key} value={opt.key}>
-                    Pilihan {opt.key} {opt.text ? `— ${opt.text}` : ''}
-                  </option>
-                ))}
-              </select>
+              <label className="block text-xs font-bold uppercase text-[#6a6a6a] mb-1">
+                {(editingQuestion.questionType || 'PG') === 'PG' ? 'Kunci Jawaban Benar' : 'Jawaban Benar (Isian)'}
+              </label>
+              {(editingQuestion.questionType || 'PG') === 'PG' ? (
+                <select
+                  value={editingQuestion.key}
+                  onChange={(e) => setEditingQuestion({ ...editingQuestion, key: e.target.value })}
+                  className="w-full bg-[#f8f3e9] border border-[#0a0a0a]/10 rounded-xl p-2.5 text-xs font-bold text-[#0a0a0a] focus:outline-none focus:border-[#0a0a0a]"
+                >
+                  {(editingQuestion.options || []).map((opt) => (
+                    <option key={opt.key} value={opt.key}>
+                      Pilihan {opt.key} {opt.text ? `— ${opt.text}` : ''}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={editingQuestion.key}
+                  onChange={(e) => setEditingQuestion({ ...editingQuestion, key: e.target.value })}
+                  placeholder="Ketik jawaban isian yang benar..."
+                  className="w-full bg-[#f8f3e9] border border-[#0a0a0a]/10 rounded-xl px-3 py-2 text-sm font-bold focus:outline-none focus:border-[#0a0a0a]"
+                />
+              )}
             </div>
 
             {/* Action Buttons */}

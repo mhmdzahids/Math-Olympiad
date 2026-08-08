@@ -9,7 +9,7 @@ Catatan (dari diskusi kita sebelumnya soal rate-limit & sesi offline):
 - Registrasi admin SENGAJA tidak ada endpoint publiknya (sesuai PRD FR-P1
   note) — akun admin dibuat manual lewat script seed, lihat README.
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
@@ -17,12 +17,14 @@ from app.database import get_db
 from app.models import User, Participant, UserRole
 from app.schemas import RegisterRequest, TokenResponse, UserOut
 from app.security import hash_password, verify_password, create_access_token, get_current_user
+from app.limiter import limiter
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-def register(payload: RegisterRequest, db: Session = Depends(get_db)):
+@limiter.limit("20/minute")
+def register(request: Request, payload: RegisterRequest, db: Session = Depends(get_db)):
     existing = db.query(User).filter(User.email == payload.email).first()
     if existing:
         raise HTTPException(
@@ -53,7 +55,8 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     """
     Pakai OAuth2PasswordRequestForm (field: username, password) supaya
     kompatibel langsung dengan Swagger UI "Authorize" button dan standar

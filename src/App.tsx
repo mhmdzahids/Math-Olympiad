@@ -9,6 +9,7 @@ import { QuizExecutionView } from './components/QuizExecutionView';
 import { AdminRoundManagerView } from './components/AdminRoundManagerView';
 import { AdminLeaderboardView } from './components/AdminLeaderboardView';
 import { AdminParticipantDetailView } from './components/AdminParticipantDetailView';
+import { AdminAccountManagerView } from './components/AdminAccountManagerView';
 import { Footer } from './components/Footer';
 import { apiService, UserOut } from './services/api';
 import { ToastContainer, ToastMessage } from './components/Toast';
@@ -268,6 +269,16 @@ export default function App() {
             >
               6. Admin Leaderboard
             </button>
+            <button
+              onClick={() => handleNavigate('admin-accounts')}
+              className={`px-3 py-1 rounded-full font-semibold transition-all ${
+                currentScreen === 'admin-accounts'
+                  ? 'bg-[#a4d4c5] text-[#0a0a0a] shadow-xs'
+                  : 'bg-white/10 text-white/80 hover:bg-white/20'
+              }`}
+            >
+              7. Kelola Akun
+            </button>
           </div>
         </div>
       )}
@@ -385,6 +396,13 @@ export default function App() {
         {currentScreen === 'admin-participant-detail' && (
           <AdminParticipantDetailView
             participantId={selectedParticipantId || 'demo-participant-id'}
+            onNavigate={handleNavigate}
+            onShowToast={showToast}
+          />
+        )}
+
+        {currentScreen === 'admin-accounts' && (
+          <AdminAccountManagerView
             onNavigate={handleNavigate}
             onShowToast={showToast}
           />

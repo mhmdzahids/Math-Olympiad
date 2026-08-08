@@ -124,7 +124,8 @@ class QuestionOptionSchema(BaseModel):
 
 class QuestionCreate(BaseModel):
     question_text: str
-    options: list[QuestionOptionSchema]
+    question_type: str = "PG"
+    options: Optional[list[QuestionOptionSchema]] = None
     correct_key: str
     image_url: Optional[str] = None
     points: Optional[int] = 10
@@ -134,7 +135,8 @@ class QuestionOut(BaseModel):
     id: str
     round_id: str
     question_text: str
-    options: list[QuestionOptionSchema]
+    question_type: str = "PG"
+    options: Optional[list[QuestionOptionSchema]] = None
     correct_key: str
     image_url: Optional[str] = None
     points: int = 10
@@ -149,7 +151,8 @@ class QuestionStudentOut(BaseModel):
     id: str
     round_id: str
     question_text: str
-    options: list[QuestionOptionSchema]
+    question_type: str = "PG"
+    options: Optional[list[QuestionOptionSchema]] = None
     image_url: Optional[str] = None
     points: int = 10
 

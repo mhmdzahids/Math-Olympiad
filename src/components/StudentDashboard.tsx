@@ -22,6 +22,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<'SD' | 'SMP' | 'SMA'>(normalizedCategory as 'SD' | 'SMP' | 'SMA');
   const [myQuizSessionsList, setMyQuizSessionsList] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isAccountActive, setIsAccountActive] = useState<boolean>(true); // default true to avoid flicker
+  const [hasPassedAnyRound, setHasPassedAnyRound] = useState<boolean>(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -51,10 +53,19 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
         // Fallback if unauthenticated / offline
       }
     }
+    async function loadActivationStatus() {
+      try {
+        const status = await apiService.getMyActivationStatus();
+        if (!isMounted) return;
+        setIsAccountActive(status.is_active);
+        setHasPassedAnyRound(status.has_passed_any_round);
+      } catch {
+        setIsAccountActive(true); // fail open
+      }
+    }
     loadMySessions();
-    return () => {
-      isMounted = false;
-    };
+    loadActivationStatus();
+    return () => { isMounted = false; };
   }, []);
 
   function getRoundScheduleInfo(round: CompetitionRound) {
@@ -105,7 +116,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
           {/* Main 2-Column Layout Skeleton */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-            
+
             {/* Left Column (2 Cols): Round Cards Stack */}
             <div className="lg:col-span-2 space-y-6">
               {/* Section Title Skeleton */}
@@ -137,7 +148,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
             {/* Right Column (1 Col): Qualification Card & Agenda Card */}
             <div className="space-y-6">
-              
+
               {/* Qualification Status Card Skeleton */}
               <div className="bg-[#ffdcd0]/70 rounded-[28px] p-6 border-2 border-[#0a0a0a]/10 clay-shadow-sm space-y-4 animate-pulse">
                 <div className="flex items-center gap-2">
@@ -154,7 +165,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               {/* Agenda OPTIMA Card Skeleton */}
               <div className="bg-[#f5f0e0]/70 rounded-[28px] p-6 border-2 border-[#0a0a0a]/10 clay-shadow-sm space-y-5 animate-pulse">
                 <div className="w-44 h-6 rounded-md bg-[#0a0a0a]/15" />
-                
+
                 {/* 3 Agenda Items */}
                 <div className="space-y-4 pt-1">
                   {[1, 2, 3].map((item) => (
@@ -248,15 +259,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                           <span className="material-symbols-outlined text-[#6a6a6a] text-4xl">
                             check_circle
                           </span>
-                          {idx === 0 && (
-                            <div className="absolute -top-6 -left-4 w-12 h-12 pointer-events-none">
-                              <img
-                                src={ASSET_IMAGES.starPeek}
-                                alt="Star Mascot"
-                                className="w-full h-full object-contain"
-                              />
-                            </div>
-                          )}
+
                         </div>
 
                         <div className="flex-grow">
@@ -303,9 +306,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                             </div>
                             <div>
                               <div className="flex items-center gap-2 flex-wrap mb-1">
-                                <span className={`text-white text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider shadow-2xs ${
-                                  isAfter ? 'bg-[#ba1a1a]' : isBefore ? 'bg-[#6a6a6a]' : 'bg-[#0a0a0a]'
-                                }`}>
+                                <span className={`text-white text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider shadow-2xs ${isAfter ? 'bg-[#ba1a1a]' : isBefore ? 'bg-[#6a6a6a]' : 'bg-[#0a0a0a]'
+                                  }`}>
                                   {isAfter ? 'BABAK DITUTUP' : isBefore ? 'BELUM DIMULAI' : 'BABAK AKTIF'}
                                 </span>
                                 {isOngoingSession && (
@@ -343,7 +345,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                             Jadwal Ujian: <strong className="text-[#0a0a0a] font-black">{formatTanggalID(sDate, sTime)} s.d {formatTanggalID(eDate, eTime)}</strong>
                           </div>
 
-                          {!isOffline && (
+                              {!isOffline && (
                             <>
                               {isCompletedSession ? (
                                 <button
@@ -354,6 +356,16 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                                 >
                                   <span className="material-symbols-outlined text-sm text-[#a4d4c5]">check_circle</span>
                                   <span>Quiz Sudah Selesai Dikerjakan</span>
+                                </button>
+                              ) : !isAccountActive ? (
+                                <button
+                                  type="button"
+                                  disabled
+                                  className="w-full sm:w-auto bg-[#ff6b5a]/20 text-[#ff6b5a] font-extrabold px-6 py-3.5 rounded-2xl text-xs sm:text-sm flex items-center justify-center gap-2 cursor-not-allowed border-2 border-[#ff6b5a]/30"
+                                  title="Akun Anda belum diaktivasi oleh admin. Hubungi panitia OPTIMA untuk konfirmasi pendaftaran."
+                                >
+                                  <span className="material-symbols-outlined text-sm">lock</span>
+                                  <span>Akun Belum Diaktivasi</span>
                                 </button>
                               ) : isOngoingSession ? (
                                 <button
@@ -452,28 +464,77 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
           {/* Right Sidebar */}
           <div className="lg:col-span-4 space-y-6">
-            {/* Qualification Status Card */}
-            <div className="bg-[#ffdbca] rounded-2xl p-6 shadow-lg relative overflow-hidden group">
-              <div className="relative z-10">
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="material-symbols-outlined text-[#8b4f2b]">campaign</span>
-                  <h2 className="font-bold text-base text-[#6e3816]">Status Kualifikasi</h2>
+            {/* Account Activation Status Card — shown when account is NOT active */}
+            {!isAccountActive ? (
+              <div className="bg-[#ff6b5a] rounded-[28px] p-5 sm:p-6 relative overflow-hidden border-2 border-[#0a0a0a] clay-shadow">
+                <div className="relative z-10">
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className="w-10 h-10 rounded-[14px] bg-[#0a0a0a] flex items-center justify-center shrink-0 clay-shadow-sm">
+                      <span className="material-symbols-outlined text-[#ff6b5a] text-[20px]">hourglass_empty</span>
+                    </div>
+                    <h2 className="font-bold text-[18px] text-[#0a0a0a] tracking-tight">Status Akun</h2>
+                  </div>
+                  
+                  <div className="bg-[#ffe3dd] rounded-[20px] p-5 border-2 border-[#0a0a0a]/10">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="w-2 h-2 rounded-full bg-[#f59e0b] animate-pulse shrink-0" />
+                      <p className="text-[11px] font-bold uppercase tracking-[1.5px] text-[#0a0a0a]/60">Verifikasi Admin</p>
+                    </div>
+                    <h3 className="text-[15px] font-bold text-[#0a0a0a] leading-[1.3] mb-1.5">
+                      Menunggu verifikasi pembayaran
+                    </h3>
+                    <p className="text-[13px] text-[#0a0a0a]/80 leading-[1.5]">
+                      Panitia sedang memeriksa kelengkapan data Anda. Akun akan diaktifkan setelah pengecekan selesai.
+                    </p>
+                  </div>
                 </div>
-
-                <div className="bg-white/50 backdrop-blur-sm rounded-xl p-4 border border-white/40 mb-4">
-                  <p className="text-sm text-[#6e3816]">
-                    Pengumuman resmi: <br />
-                    <strong className="text-[#0a0a0a] font-black text-base">
-                      "Anda lolos ke Penyisihan 2!"
-                    </strong>
+              </div>
+            ) : hasPassedAnyRound ? (
+              /* Qualification Status Card — shown after passing any round */
+              <div className="bg-[#ffdbca] rounded-2xl p-6 shadow-lg relative overflow-hidden group border-2 border-[#0a0a0a]/10 clay-shadow">
+                <div className="relative z-10">
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="material-symbols-outlined text-[#8b4f2b]">campaign</span>
+                    <h2 className="font-bold text-base text-[#6e3816]">Status Kualifikasi</h2>
+                  </div>
+                  <div className="bg-white/50 backdrop-blur-sm rounded-xl p-4 border border-white/40 mb-4">
+                    <p className="text-sm text-[#6e3816]">
+                      Selamat! Anda telah lolos ke babak berikutnya.<br />
+                      <strong className="text-[#0a0a0a] font-black text-base">
+                        Persiapkan diri untuk babak selanjutnya!
+                      </strong>
+                    </p>
+                  </div>
+                  <p className="text-xs text-[#6e3816]/90 leading-relaxed">
+                    Terus semangat dan pertahankan prestasimu di babak selanjutnya!
                   </p>
                 </div>
-
-                <p className="text-xs text-[#6e3816]/90 leading-relaxed">
-                  Hasil Anda di babak sebelumnya menempatkan Anda di 15% peserta teratas. Pertahankan prestasi ini!
-                </p>
               </div>
-            </div>
+            ) : (
+              /* Active but not passed — show friendly status card */
+              <div className="bg-[#a4d4c5] rounded-2xl p-6 shadow-lg relative overflow-hidden border-2 border-[#0a0a0a]/10 clay-shadow">
+                <div className="relative z-10">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-8 h-8 rounded-xl bg-[#0a0a0a] flex items-center justify-center">
+                      <span className="material-symbols-outlined text-[#a4d4c5] text-lg">verified</span>
+                    </div>
+                    <h2 className="font-bold text-base text-[#0a0a0a]">Status Akun</h2>
+                  </div>
+                  <div className="bg-white/60 rounded-xl p-4 border border-white/40 mb-4">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-[#0a0a0a] shrink-0" />
+                      <p className="text-xs font-black uppercase text-[#0a0a0a] tracking-wide">Akun Terverifikasi</p>
+                    </div>
+                    <p className="text-sm font-bold text-[#0a0a0a] mt-1">
+                      Akun Anda sudah aktif. Selamat mengikuti kompetisi!
+                    </p>
+                  </div>
+                  <p className="text-xs text-[#0a0a0a]/70 leading-relaxed">
+                    Ikuti babak kompetisi sesuai jadwal. Semangat!
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Upcoming Agenda Card */}
             <div className="bg-[#f5f0e0] rounded-2xl p-6 border border-[#e7e2d8]">

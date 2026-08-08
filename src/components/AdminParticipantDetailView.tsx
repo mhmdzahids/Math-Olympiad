@@ -396,8 +396,10 @@ export const AdminParticipantDetailView: React.FC<AdminParticipantDetailViewProp
                   {filteredQuestions.map((q) => {
                     const isExpanded = expandedQuestionId === q.question_id;
                     const optionsObj: Record<string, string> = Array.isArray(q.options)
-                      ? q.options.reduce((acc, cur) => ({ ...acc, [cur.key]: cur.text }), {})
-                      : (q.options as Record<string, string>);
+                      ? q.options.reduce((acc: any, cur: any) => ({ ...acc, [cur.key]: cur.text }), {})
+                      : (q.options as Record<string, string> || {});
+                    
+                    const hasOptions = Object.keys(optionsObj).length > 0;
 
                     return (
                       <div
@@ -425,7 +427,7 @@ export const AdminParticipantDetailView: React.FC<AdminParticipantDetailViewProp
 
                             <div>
                               <div className="font-black text-sm text-[#0a0a0a] line-clamp-1">
-                                Soal #{q.number}
+                                Soal #{q.number} {hasOptions ? '' : '(ISIAN)'}
                               </div>
                               <div className="text-[11px] font-bold uppercase tracking-wider flex items-center gap-2 mt-0.5">
                                 {q.status === 'correct' ? (
@@ -466,36 +468,67 @@ export const AdminParticipantDetailView: React.FC<AdminParticipantDetailViewProp
                               </div>
                             )}
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
-                              {['A', 'B', 'C', 'D'].map((key) => {
-                                const optText = optionsObj[key] || '';
-                                const isStudentChoice = q.submitted_answer?.toUpperCase() === key;
-                                const isCorrectKey = q.correct_answer.toUpperCase() === key;
+                            {hasOptions ? (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
+                                {['A', 'B', 'C', 'D'].map((key) => {
+                                  const optText = optionsObj[key] || '';
+                                  const isStudentChoice = q.submitted_answer?.toUpperCase() === key;
+                                  const isCorrectKey = q.correct_answer.toUpperCase() === key;
 
-                                let style = 'bg-white border-[#0a0a0a]/15 text-[#0a0a0a]';
-                                if (isStudentChoice && isCorrectKey) {
-                                  style = 'bg-[#a4d4c5] border-[#0f5236] font-bold text-[#0f5236]';
-                                } else if (isStudentChoice && !isCorrectKey) {
-                                  style = 'bg-[#ffdad6] border-[#ba1a1a] font-bold text-[#ba1a1a]';
-                                } else if (isCorrectKey) {
-                                  style = 'bg-white border-2 border-[#0f5236] font-bold text-[#0f5236]';
-                                }
+                                  let style = 'bg-white border-[#0a0a0a]/15 text-[#0a0a0a]';
+                                  if (isStudentChoice && isCorrectKey) {
+                                    style = 'bg-[#a4d4c5] border-[#0f5236] font-bold text-[#0f5236]';
+                                  } else if (isStudentChoice && !isCorrectKey) {
+                                    style = 'bg-[#ffdad6] border-[#ba1a1a] font-bold text-[#ba1a1a]';
+                                  } else if (isCorrectKey) {
+                                    style = 'bg-white border-2 border-[#0f5236] font-bold text-[#0f5236]';
+                                  }
 
-                                return (
-                                  <div key={key} className={`p-3 rounded-xl border flex items-start gap-2 text-xs ${style}`}>
-                                    <span className="font-black shrink-0">{key}.</span>
-                                    <div className="flex-1">
-                                      <MathText text={optText} />
+                                  return (
+                                    <div key={key} className={`p-3 rounded-xl border flex items-start gap-2 text-xs ${style}`}>
+                                      <span className="font-black shrink-0">{key}.</span>
+                                      <div className="flex-1">
+                                        <MathText text={optText} />
+                                      </div>
+                                      {isStudentChoice && (
+                                        <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-[#0a0a0a] text-white shrink-0">
+                                          Jawaban Peserta
+                                        </span>
+                                      )}
                                     </div>
-                                    {isStudentChoice && (
-                                      <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-[#0a0a0a] text-white shrink-0">
-                                        Jawaban Peserta
-                                      </span>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                                <div className="p-4 rounded-xl border-2 border-[#0f5236]/30 bg-[#a4d4c5]/20 flex flex-col gap-1.5 text-xs">
+                                  <span className="text-[10px] font-black uppercase tracking-wider text-[#0f5236]">Jawaban Benar</span>
+                                  <div className="font-bold text-[#0f5236] text-sm">
+                                    <MathText text={q.correct_answer} />
+                                  </div>
+                                </div>
+                                <div className={`p-4 rounded-xl border-2 flex flex-col gap-1.5 text-xs ${
+                                  q.status === 'correct'
+                                    ? 'border-[#0f5236] bg-[#a4d4c5]'
+                                    : q.status === 'incorrect'
+                                    ? 'border-[#ba1a1a] bg-[#ffdad6]'
+                                    : 'border-[#0a0a0a]/20 bg-white'
+                                }`}>
+                                  <span className={`text-[10px] font-black uppercase tracking-wider ${
+                                    q.status === 'correct' ? 'text-[#0f5236]' : q.status === 'incorrect' ? 'text-[#ba1a1a]' : 'text-[#6a6a6a]'
+                                  }`}>Jawaban Peserta</span>
+                                  <div className={`font-bold text-sm ${
+                                    q.status === 'correct' ? 'text-[#0f5236]' : q.status === 'incorrect' ? 'text-[#ba1a1a]' : 'text-[#0a0a0a]'
+                                  }`}>
+                                    {q.submitted_answer ? (
+                                      <MathText text={q.submitted_answer} />
+                                    ) : (
+                                      <span className="text-[#6a6a6a] italic">Tidak dijawab</span>
                                     )}
                                   </div>
-                                );
-                              })}
-                            </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

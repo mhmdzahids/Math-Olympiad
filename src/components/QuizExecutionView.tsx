@@ -19,21 +19,9 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
   questions: propQuestions
 }) => {
   const [currentIdx, setCurrentIdx] = useState(0);
-  const [userAnswers, setUserAnswers] = useState<Record<number, 'A' | 'B' | 'C' | 'D'>>(() => {
-    if (activeRound?.id) {
-      const saved = localStorage.getItem(`optima_ans_${activeRound.id}`);
-      if (saved) return JSON.parse(saved);
-    }
-    return {};
-  });
-
-  const [flagged, setFlagged] = useState<Record<number, boolean>>(() => {
-    if (activeRound?.id) {
-      const saved = localStorage.getItem(`optima_flg_${activeRound.id}`);
-      if (saved) return JSON.parse(saved);
-    }
-    return {};
-  });
+  const [userAnswers, setUserAnswers] = useState<Record<string | number, string>>({});
+  const [flagged, setFlagged] = useState<Record<string | number, boolean>>({});
+  const [sessionId, setSessionId] = useState<string | null>(null);
 
   const [loadingQuestions, setLoadingQuestions] = useState<boolean>(true);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -44,12 +32,8 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
   const [timeLeft, setTimeLeft] = useState<number>(durationMins * 60);
   const [tabSwitches, setTabSwitches] = useState<number>(0);
   const [showAntiCheatModal, setShowAntiCheatModal] = useState<boolean>(false);
-  const [showTutorialModal, setShowTutorialModal] = useState<boolean>(() => {
-    if (activeRound?.id) {
-      return localStorage.getItem(`optima_tut_${activeRound.id}`) !== 'true';
-    }
-    return true;
-  });
+  const [showTutorialModal, setShowTutorialModal] = useState<boolean>(true);
+  const [showSubmitConfirmModal, setShowSubmitConfirmModal] = useState<boolean>(false);
   const [lastActivityLog, setLastActivityLog] = useState<string>('');
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
 
@@ -61,17 +45,17 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
 
   useEffect(() => {
     userAnswersRef.current = userAnswers;
-    if (activeRound?.id) {
-      localStorage.setItem(`optima_ans_${activeRound.id}`, JSON.stringify(userAnswers));
+    if (sessionId) {
+      localStorage.setItem(`optima_ans_${sessionId}`, JSON.stringify(userAnswers));
     }
-  }, [userAnswers, activeRound?.id]);
+  }, [userAnswers, sessionId]);
 
   useEffect(() => {
     flaggedRef.current = flagged;
-    if (activeRound?.id) {
-      localStorage.setItem(`optima_flg_${activeRound.id}`, JSON.stringify(flagged));
+    if (sessionId) {
+      localStorage.setItem(`optima_flg_${sessionId}`, JSON.stringify(flagged));
     }
-  }, [flagged, activeRound?.id]);
+  }, [flagged, sessionId]);
 
   // Anti-Cheat: Disable Copy, Paste & Context Menu
   useEffect(() => {
@@ -101,18 +85,38 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
 
       if (isRealRound) {
         try {
-          // 1. Start or resume Quiz Session from Backend Server
-          const session = await apiService.startQuizSession(roundId).catch(() => null);
+          let session;
+          try {
+            session = await apiService.startQuizSession(roundId);
+          } catch (err: any) {
+            if (!isMounted) return;
+            console.error('Quiz start failed:', err);
+            alert(err.message || 'Gagal memulai kuis. Silakan periksa kembali status akun Anda.');
+            onNavigate('student-dashboard');
+            return;
+          }
+
           if (!isMounted) return;
 
           if (session) {
+            setSessionId(session.session_id);
             setTimeLeft(session.remaining_seconds);
             setTabSwitches(session.tab_switch_count);
             if (session.is_submitted) {
               setIsSubmitted(true);
             }
-          } else {
-            setTimeLeft((activeRound.durationMinutes || 60) * 60);
+
+            // Restore state from local storage using unique session_id
+            const savedAns = localStorage.getItem(`optima_ans_${session.session_id}`);
+            if (savedAns) setUserAnswers(JSON.parse(savedAns));
+
+            const savedFlg = localStorage.getItem(`optima_flg_${session.session_id}`);
+            if (savedFlg) setFlagged(JSON.parse(savedFlg));
+            
+            const hasSeenTut = localStorage.getItem(`optima_tut_${session.session_id}`);
+            if (hasSeenTut === 'true' || session.is_submitted) {
+              setShowTutorialModal(false);
+            }
           }
 
           // 2. Fetch Questions WITHOUT correct_key (Secure Anti-Cheat Endpoint)
@@ -120,9 +124,10 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
           if (!isMounted) return;
           if (dbQuestions && dbQuestions.length > 0) {
             const formatted: Question[] = dbQuestions.map((q, idx) => ({
-              id: idx + 1,
+              id: q.id as string,
               code: `SOAL ${idx + 1} • ${(activeRound.category || studentCategory || 'SD').toUpperCase()}`,
               text: q.question_text,
+              type: q.question_type as 'PG' | 'ISIAN',
               diagramUrl: q.image_url,
               options: (q.options || []).map((opt) => ({
                 id: (opt.key || 'A').toUpperCase() as 'A' | 'B' | 'C' | 'D',
@@ -257,12 +262,9 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
   const activeQuestions = questions.length > 0 ? questions : MOCK_QUESTIONS;
   const currentQ = activeQuestions[currentIdx] || activeQuestions[0];
 
-  const handleSelectOption = (optId: 'A' | 'B' | 'C' | 'D') => {
+  const handleSelectOption = (optId: string) => {
     if (isSubmitted) return;
-    setUserAnswers((prev) => ({
-      ...prev,
-      [currentQ.id]: optId
-    }));
+    setUserAnswers((prev) => ({ ...prev, [currentQ.id]: optId }));
   };
 
   const toggleFlagCurrent = () => {
@@ -274,18 +276,8 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
   };
 
   const handleSubmitQuiz = async () => {
-    if (window.confirm('Apakah Anda yakin ingin mengumpulkan kuis Anda?')) {
-      setIsSubmitted(true);
-      if (activeRound?.id && isValidUUID(activeRound.id)) {
-        try {
-          await apiService.submitQuizAnswers(activeRound.id, userAnswers);
-        } catch (err) {
-          console.warn('Backend quiz submit error:', err);
-        }
-      }
-      alert('Kuis berhasil dikumpulkan dan dinilai secara aman di server!');
-      onNavigate('student-dashboard');
-    }
+    if (isSubmitted) return;
+    setShowSubmitConfirmModal(true);
   };
 
   return (
@@ -368,42 +360,58 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
             )}
           </div>
 
-          {/* Options Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {currentQ.options.map((opt) => {
-              const isSelected = userAnswers[currentQ.id] === opt.id;
-              return (
-                <button
-                  key={opt.id}
-                  disabled={isSubmitted}
-                  onClick={() => handleSelectOption(opt.id)}
-                  className={`group flex items-center gap-4 p-4 rounded-[16px] text-left transition-all cursor-pointer ${
-                    isSelected
-                      ? 'bg-[#feaf83]/10 border-2 border-[#feaf83] clay-shadow ring-4 ring-[#feaf83]/10'
-                      : 'bg-white border-2 border-transparent clay-shadow-sm hover:border-[#a4d4c5] active:scale-[0.98]'
-                  }`}
-                >
-                  <div
-                    className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-base transition-colors shrink-0 ${
+          {currentQ.type === 'ISIAN' ? (
+            <div className="w-full mt-4">
+              <input
+                type="text"
+                disabled={isSubmitted}
+                value={userAnswers[currentQ.id] || ''}
+                onChange={(e) => handleSelectOption(e.target.value)}
+                placeholder="Ketik jawaban Anda di sini..."
+                className="w-full bg-white border-2 border-[#e7e2d8] focus:border-[#a4d4c5] p-5 rounded-2xl text-lg font-bold text-[#0a0a0a] outline-none clay-shadow-sm transition-colors disabled:opacity-50"
+              />
+              <p className="text-sm text-[#6a6a6a] mt-2 ml-1">
+                <span className="material-symbols-outlined text-[14px] align-middle mr-1">info</span>
+                Ketik jawaban singkat. Jika jawaban adalah angka satuan, ketikkan langsung (misal: "12"). Jika ada satuan, ikuti format soal.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              {currentQ.options?.map((opt) => {
+                const isSelected = userAnswers[currentQ.id] === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    disabled={isSubmitted}
+                    onClick={() => handleSelectOption(opt.id)}
+                    className={`group flex items-center gap-4 p-4 rounded-[16px] text-left transition-all cursor-pointer ${
                       isSelected
-                        ? 'bg-[#e8b94a] text-[#0a0a0a]'
-                        : 'bg-[#e7e2d8] text-[#0a0a0a] group-hover:bg-[#a4d4c5]'
+                        ? 'bg-[#feaf83]/10 border-2 border-[#feaf83] clay-shadow ring-4 ring-[#feaf83]/10'
+                        : 'bg-white border-2 border-transparent clay-shadow-sm hover:border-[#a4d4c5] active:scale-[0.98]'
                     }`}
                   >
-                    {opt.id}
-                  </div>
-                  <span className={`text-sm sm:text-base ${isSelected ? 'font-bold text-[#0a0a0a]' : 'font-medium text-[#1d1c16]'}`}>
-                    <MathText text={opt.text} />
-                  </span>
-                  {isSelected && (
-                    <span className="ml-auto material-symbols-outlined text-[#e8b94a]">
-                      check_circle
+                    <div
+                      className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-base transition-colors shrink-0 ${
+                        isSelected
+                          ? 'bg-[#e8b94a] text-[#0a0a0a]'
+                          : 'bg-[#e7e2d8] text-[#0a0a0a] group-hover:bg-[#a4d4c5]'
+                      }`}
+                    >
+                      {opt.id}
+                    </div>
+                    <span className={`text-sm sm:text-base ${isSelected ? 'font-bold text-[#0a0a0a]' : 'font-medium text-[#1d1c16]'}`}>
+                      <MathText text={opt.text} />
                     </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+                    {isSelected && (
+                      <span className="ml-auto material-symbols-outlined text-[#e8b94a]">
+                        check_circle
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* Navigation Controls */}
           <div className="flex justify-between items-center mt-4">
@@ -472,7 +480,7 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
                   onClick={() => setCurrentIdx(idx)}
                   className={`w-full aspect-square rounded-lg text-xs flex items-center justify-center transition-transform active:scale-90 cursor-pointer ${btnStyle}`}
                 >
-                  {q.id}
+                  {idx + 1}
                   {isFlagged && !isCurrent && (
                     <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-[#ba1a1a] rounded-full" />
                   )}
@@ -499,7 +507,7 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
         </aside>
       </main>
 
-      {/* Overlay Modal: Anti-Cheat Warning Modal */}
+      {/* Anti Cheat Violation Modal */}
       {showAntiCheatModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div 
@@ -574,13 +582,54 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
         </div>
       )}
 
+      {/* Submit Confirm Modal */}
+      {showSubmitConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+          <div className="fixed inset-0 bg-[#0a0a0a]/70 backdrop-blur-xs animate-in fade-in duration-300" />
+          <div className="relative bg-[#fef9ef] max-w-sm w-full rounded-[32px] p-6 border-2 border-[#0a0a0a] shadow-2xl z-10 animate-in zoom-in-95 duration-300 text-center space-y-4">
+            <div className="w-16 h-16 rounded-3xl bg-[#ffaf83] border-2 border-[#0a0a0a] flex items-center justify-center mx-auto mb-2 clay-shadow-sm">
+              <span className="material-symbols-outlined text-3xl text-[#0a0a0a]">assignment_turned_in</span>
+            </div>
+            <h3 className="text-xl sm:text-2xl font-black text-[#0a0a0a] leading-tight">Kumpulkan Kuis?</h3>
+            <p className="text-sm font-bold text-[#3a3a3a] leading-relaxed mb-4">
+              Apakah Anda yakin ingin mengumpulkan kuis Anda? Jawaban tidak dapat diubah lagi setelah dikumpulkan.
+            </p>
+            <div className="flex gap-3 justify-center mt-6">
+              <button
+                onClick={() => setShowSubmitConfirmModal(false)}
+                className="px-5 py-3 rounded-xl border-2 border-[#0a0a0a] bg-[#f2ede4] font-bold text-[#0a0a0a] text-sm flex-1 hover:bg-[#e7e2d8] transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                onClick={async () => {
+                  setShowSubmitConfirmModal(false);
+                  setIsSubmitted(true);
+                  if (activeRound?.id && isValidUUID(activeRound.id)) {
+                    try {
+                      await apiService.submitQuizAnswers(activeRound.id, userAnswersRef.current);
+                    } catch (err) {
+                      console.warn('Backend quiz submit error:', err);
+                    }
+                  }
+                  onNavigate('student-dashboard');
+                }}
+                className="px-5 py-3 rounded-xl border-2 border-[#0a0a0a] bg-[#0a0a0a] font-bold text-white text-sm flex-1 hover:bg-[#0a0a0a]/90 transition-colors clay-button-active"
+              >
+                Kumpulkan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Interactive Walkthrough Tutorial Modal Before Quiz Timer Starts */}
       <QuizTutorialModal
-        isOpen={showTutorialModal}
+        isOpen={showTutorialModal && !loadingQuestions}
         onComplete={() => {
           setShowTutorialModal(false);
-          if (activeRound?.id) {
-            localStorage.setItem(`optima_tut_${activeRound.id}`, 'true');
+          if (sessionId) {
+            localStorage.setItem(`optima_tut_${sessionId}`, 'true');
           }
         }}
         activeRoundTitle={activeRound?.title || 'Babak Penyisihan 1 (SD)'}
