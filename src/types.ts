@@ -5,20 +5,22 @@ export type ScreenView =
   | 'quiz' 
   | 'admin-rounds' 
   | 'admin-leaderboard'
-  | 'admin-participant-detail';
+  | 'admin-participant-detail'
+  | 'admin-accounts';
 
 export interface Question {
-  id: number;
+  id: string | number;
   code: string; // e.g. "GEOMETRY • HARD"
   text: string;
+  type?: 'PG' | 'ISIAN';
   note?: string;
   diagramUrl?: string;
   figLabel?: string;
-  options: {
+  options?: {
     id: 'A' | 'B' | 'C' | 'D';
     text: string;
   }[];
-  correctOption: 'A' | 'B' | 'C' | 'D';
+  correctOption: string;
 }
 
 export interface CompetitionRound {
@@ -56,7 +58,8 @@ export interface Participant {
 export interface ParsedQuestion {
   id: string;
   questionText: string;
-  options: { key: string; text: string }[];
+  questionType?: 'PG' | 'ISIAN';
+  options?: { key: string; text: string }[];
   key: string;
   isError?: boolean;
   errorMessage?: string;

@@ -1,4 +1,4 @@
-import { ParticipantDetailData } from '../types';
+import { ParticipantDetailData, RoundSessionSummary } from '../types';
 
 const API_BASE_URL = '/api';
 
@@ -10,6 +10,17 @@ export interface RegisterPayload {
   category: 'sd' | 'smp' | 'sma';
   grade?: string;
   phone?: string;
+}
+
+export interface RegisterCollectivePayload {
+  teacher_email: string;
+  teacher_name: string;
+  school_name: string;
+  students: {
+    name: string;
+    category: 'sd' | 'smp' | 'sma';
+    grade: string;
+  }[];
 }
 
 export interface ParticipantOut {
@@ -56,6 +67,7 @@ export interface QuestionData {
   id: string;
   round_id: string;
   question_text: string;
+  question_type?: 'PG' | 'ISIAN';
   options: { key: string; text: string }[];
   correct_key: string;
   image_url?: string;
@@ -123,10 +135,66 @@ class ApiService {
 
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData.detail || 'Registrasi gagal.');
+      let errMsg = 'Registrasi gagal.';
+      if (typeof errorData.detail === 'string') {
+        errMsg = errorData.detail;
+      } else if (Array.isArray(errorData.detail)) {
+        errMsg = errorData.detail.map((e: any) => e.msg).join(', ');
+      } else if (errorData.detail) {
+        errMsg = JSON.stringify(errorData.detail);
+      }
+      throw new Error(errMsg);
     }
 
     return res.json();
+  }
+
+  async createAdmin(payload: any): Promise<UserOut> {
+    const res = await fetch(`${API_BASE_URL}/auth/admin/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      let errMsg = 'Gagal membuat akun admin.';
+      if (typeof errorData.detail === 'string') {
+        errMsg = errorData.detail;
+      } else if (Array.isArray(errorData.detail)) {
+        errMsg = errorData.detail.map((e: any) => e.msg).join(', ');
+      } else if (errorData.detail) {
+        errMsg = JSON.stringify(errorData.detail);
+      }
+      throw new Error(errMsg);
+    }
+
+    return res.json();
+  }
+
+
+  async registerCollective(payload: RegisterCollectivePayload): Promise<{message: string, students_count: number}> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/register_collective`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Terjadi kesalahan saat pendaftaran kolektif');
+      }
+
+      return await res.json();
+    } catch (error) {
+      console.error('API register_collective error:', error);
+      throw error;
+    }
   }
 
   async getMe(): Promise<UserOut> {
@@ -294,6 +362,8 @@ class ApiService {
     } catch (e) {
       // ignore
     }
+
+    const isSafeSession = foundTabSwitches < 3;
 
     let allRoundsData: RoundSessionSummary[] = [];
     try {
@@ -464,7 +534,8 @@ class ApiService {
     const payload = {
       questions: questions.map((q) => ({
         question_text: q.questionText || q.question_text,
-        options: q.options || [],
+        question_type: q.questionType || q.question_type || (q.options?.length ? 'PG' : 'ISIAN'),
+        options: q.options || null,
         correct_key: q.key || q.correct_key || 'A',
         image_url: q.imageUrl || q.image_url || null,
         points: 10,
@@ -508,7 +579,9 @@ class ApiService {
   }
 
   async getStudentQuestions(roundId: string): Promise<QuestionData[]> {
-    const res = await fetch(`${API_BASE_URL}/rounds/${roundId}/questions/student`);
+    const res = await fetch(`${API_BASE_URL}/rounds/${roundId}/questions/student`, {
+      headers: this.getAuthHeaders(),
+    });
     if (!res.ok) throw new Error('Gagal mengambil daftar soal kuis.');
     return res.json();
   }
@@ -565,6 +638,79 @@ class ApiService {
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.detail || 'Gagal mengumpulkan kuis ke server.');
+    }
+    return res.json();
+  }
+
+  // ── Account Activation ──────────────────────────────────────
+  async getMyActivationStatus(): Promise<{ is_active: boolean; has_passed_any_round: boolean; has_failed_any_round: boolean; full_name: string }> {
+    const res = await fetch(`${API_BASE_URL}/rounds/my/activation-status`, {
+      headers: this.getAuthHeaders(),
+    });
+    if (!res.ok) return { is_active: true, has_passed_any_round: false, has_failed_any_round: false, full_name: '' };
+    return res.json();
+  }
+
+  async getAdminAccounts(category?: string): Promise<any[]> {
+    const url = category
+      ? `${API_BASE_URL}/rounds/admin/accounts?category=${category}`
+      : `${API_BASE_URL}/rounds/admin/accounts`;
+    const res = await fetch(url, { headers: this.getAuthHeaders() });
+    if (!res.ok) return [];
+    return res.json();
+  }
+
+  async activateAccount(participantId: string): Promise<{ status: string; message: string }> {
+    const res = await fetch(`${API_BASE_URL}/rounds/admin/accounts/${participantId}/activate`, {
+      method: 'PATCH',
+      headers: this.getAuthHeaders(),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Gagal mengaktifkan akun.');
+    }
+    return res.json();
+  }
+
+  async deactivateAccount(participantId: string): Promise<{ status: string; message: string }> {
+    const res = await fetch(`${API_BASE_URL}/rounds/admin/accounts/${participantId}/deactivate`, {
+      method: 'PATCH',
+      headers: this.getAuthHeaders(),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Gagal menonaktifkan akun.');
+    }
+    return res.json();
+  }
+
+  async updateParticipantProfile(participantId: string, data: {
+    full_name?: string;
+    school_name?: string;
+    grade?: string;
+    phone?: string;
+    category?: string;
+  }): Promise<{ status: string; message: string }> {
+    const res = await fetch(`${API_BASE_URL}/rounds/admin/accounts/${participantId}`, {
+      method: 'PUT',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Gagal memperbarui profil.');
+    }
+    return res.json();
+  }
+
+  async deleteParticipantAccount(participantId: string): Promise<{ status: string; message: string }> {
+    const res = await fetch(`${API_BASE_URL}/rounds/admin/accounts/${participantId}`, {
+      method: 'DELETE',
+      headers: this.getAuthHeaders(),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Gagal menghapus akun.');
     }
     return res.json();
   }

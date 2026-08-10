@@ -35,11 +35,11 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
 
   // Guru / Kolektif fields
   const [teacherName, setTeacherName] = useState('Bpk. Budi Santoso, S.Pd.');
-  const [teacherPhone, setTeacherPhone] = useState('081234567890');
+  const [teacherPhone, setTeacherPhone] = useState('');
   const [studentsList, setStudentsList] = useState<Array<{ id: string; name: string; category: 'SD' | 'SMP' | 'SMA'; grade: string }>>([
-    { id: '1', name: 'Andi Pratama', category: 'SMA', grade: 'Kelas 10 (SMA)' },
-    { id: '2', name: 'Siti Rahma', category: 'SMP', grade: 'Kelas 8 (SMP)' },
+    { id: '1', name: '', category: 'SD', grade: '' },
   ]);
+  const [isCollectiveSuccess, setIsCollectiveSuccess] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -119,18 +119,38 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
 
     setIsSubmitting(true);
     try {
-      const regCategory = category === 'SD' ? 'sd' : category === 'SMP' ? 'smp' : 'sma';
-      await apiService.register({
-        email,
-        password,
-        full_name: fullName,
-        school_name: school,
-        category: regCategory,
-        grade,
-      });
+      if (regType === 'individu') {
+        const regCategory = category === 'SD' ? 'sd' : category === 'SMP' ? 'smp' : 'sma';
+        await apiService.register({
+          email,
+          password,
+          full_name: fullName,
+          school_name: school,
+          category: regCategory,
+          grade,
+        });
+        // Auto login after successful registration
+        await executeLogin(email, password);
+      } else {
+        // Kolektif / Guru
+        const validStudents = studentsList.filter(s => s.name.trim() !== '').map(s => ({
+          name: s.name,
+          category: s.category === 'SD' ? 'sd' : s.category === 'SMP' ? 'smp' : 'sma' as 'sd' | 'smp' | 'sma',
+          grade: s.grade,
+        }));
 
-      // Auto login after successful registration
-      await executeLogin(email, password);
+        if (validStudents.length === 0) {
+          throw new Error('Minimal harus ada 1 siswa yang didaftarkan.');
+        }
+
+        await apiService.registerCollective({
+          teacher_email: email,
+          teacher_name: teacherName,
+          school_name: school,
+          students: validStudents,
+        });
+        setIsCollectiveSuccess(true);
+      }
     } catch (err: any) {
       setErrorMessage(err.message || 'Registrasi gagal. Periksa kembali data Anda.');
       setIsSubmitting(false);
@@ -152,52 +172,78 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
 
         <div className="bg-white rounded-[32px] p-6 sm:p-10 clay-shadow border border-[#e7e2d8] relative z-10">
           {/* Header Banner */}
-          <div className="mb-8 rounded-2xl overflow-hidden border-2 border-[#feaf83]/60 shadow-md bg-[#fffaf0]">
-            <img
-              src={ASSET_IMAGES.competitionBanner}
-              alt="OPTIMA MATRIX 2026 Banner"
-              className="w-full h-auto object-cover max-h-48 sm:max-h-56"
-              referrerPolicy="no-referrer"
-            />
-          </div>
-
-          <div className="text-center mb-8">
-            <h1 className="text-3xl sm:text-4xl font-extrabold text-[#0a0a0a] tracking-tight mt-2">
-              {activeTab === 'register' ? 'Pendaftaran Peserta' : 'Masuk Portal Kuis'}
-            </h1>
-            <p className="text-xs sm:text-sm text-[#6a6a6a] mt-1.5">
-              {activeTab === 'register'
-                ? 'Daftar sebagai peserta OPTIMA 2026 Se-Pulau Jawa (SD/MI, SMP/MTs, SMA/SMK/MA).'
-                : 'Masuk dengan email Anda untuk memulai pengerjaan babak kuis.'}
-            </p>
-
-            {/* Tab Pill Switcher */}
-            <div className="inline-flex bg-[#f8f3e9] p-1.5 rounded-2xl border border-[#0a0a0a]/10 mt-5 gap-1 w-full sm:w-auto">
-              <button
-                type="button"
-                onClick={() => setActiveTab('register')}
-                className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${activeTab === 'register'
-                  ? 'bg-[#0a0a0a] text-white shadow-md'
-                  : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
-                  }`}
-              >
-                Formulir Pendaftaran
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('login')}
-                className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${activeTab === 'login'
-                  ? 'bg-[#0a0a0a] text-white shadow-md'
-                  : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
-                  }`}
-              >
-                Masuk Akun
-              </button>
+          {!isCollectiveSuccess && (
+            <div className="mb-8 rounded-2xl overflow-hidden border-2 border-[#feaf83]/60 shadow-md bg-[#fffaf0]">
+              <img
+                src={ASSET_IMAGES.competitionBanner}
+                alt="OPTIMA MATRIX 2026 Banner"
+                className="w-full h-auto object-cover max-h-48 sm:max-h-56"
+                referrerPolicy="no-referrer"
+              />
             </div>
-          </div>
+          )}
 
-          <form id="register-form" onSubmit={handleSubmit} className="space-y-6">
-            {activeTab === 'register' ? (
+          {!isCollectiveSuccess && (
+            <div className="text-center mb-8">
+              <h1 className="text-3xl sm:text-4xl font-extrabold text-[#0a0a0a] tracking-tight mt-2">
+                {activeTab === 'register' ? 'Pendaftaran Peserta' : 'Masuk Portal Kuis'}
+              </h1>
+              <p className="text-xs sm:text-sm text-[#6a6a6a] mt-1.5">
+                {activeTab === 'register'
+                  ? 'Daftar sebagai peserta OPTIMA 2026 Se-Pulau Jawa (SD/MI, SMP/MTs, SMA/SMK/MA).'
+                  : 'Masuk dengan email Anda untuk memulai pengerjaan babak kuis.'}
+              </p>
+
+              {/* Tab Pill Switcher */}
+              <div className="inline-flex bg-[#f8f3e9] p-1.5 rounded-2xl border border-[#0a0a0a]/10 mt-5 gap-1 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('register')}
+                  className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${activeTab === 'register'
+                    ? 'bg-[#0a0a0a] text-white shadow-md'
+                    : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
+                    }`}
+                >
+                  Formulir Pendaftaran
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('login')}
+                  className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${activeTab === 'login'
+                    ? 'bg-[#0a0a0a] text-white shadow-md'
+                    : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
+                    }`}
+                >
+                  Masuk Akun
+                </button>
+              </div>
+            </div>
+          )}
+
+          {isCollectiveSuccess ? (
+            <div className="text-center space-y-6 py-8">
+              <div className="w-20 h-20 bg-[#a4d4c5] rounded-full mx-auto flex items-center justify-center border-4 border-[#0a0a0a] clay-shadow">
+                <span className="material-symbols-outlined text-4xl text-[#0a0a0a]">check_circle</span>
+              </div>
+              <div>
+                <h2 className="text-2xl font-black text-[#0a0a0a] mb-2">Pendaftaran Kolektif Berhasil!</h2>
+                <p className="text-sm text-[#6a6a6a] max-w-md mx-auto leading-relaxed">
+                  Data siswa telah berhasil didaftarkan. ID Peserta dan Kata Sandi (Password) untuk setiap siswa telah dikirimkan secara otomatis ke alamat email Anda (<strong>{email || 'Guru Pendamping'}</strong>).
+                </p>
+              </div>
+              <div className="pt-4">
+                <button
+                  type="button"
+                  onClick={() => onNavigate('landing')}
+                  className="bg-[#0a0a0a] hover:bg-[#0a0a0a]/90 text-white font-bold py-3 px-8 rounded-2xl clay-shadow transition-all text-sm"
+                >
+                  Kembali ke Beranda
+                </button>
+              </div>
+            </div>
+          ) : (
+            <form id="register-form" onSubmit={handleSubmit} className="space-y-6">
+              {activeTab === 'register' ? (
               <>
                 {/* Registration Type */}
                 <div>
@@ -360,12 +406,22 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
                   <div className="space-y-6">
                     <div className="bg-[#a4d4c5]/20 p-4 rounded-2xl border border-[#2c7a65]/20 grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
+                        <label className="block text-[11px] font-bold text-[#0a0a0a] uppercase mb-1">Email Guru</label>
+                        <input
+                          type="email"
+                          required
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="guru@sekolah.sch.id"
+                          className="w-full bg-[#fffaf0] border-2 border-[#0a0a0a]/15 rounded-xl px-3 py-2 text-sm font-semibold"
+                        />
+                      </div>
+                      <div>
                         <label className="block text-[11px] font-bold text-[#0a0a0a] uppercase mb-1">Nama Guru Pendamping</label>
                         <input
                           type="text"
                           required
                           onChange={(e) => setTeacherName(e.target.value)}
-                          placeholder={teacherName}
+                          placeholder="cth. Budi Santoso"
                           className="w-full bg-[#fffaf0] border-2 border-[#0a0a0a]/15 rounded-xl px-3 py-2 text-sm font-semibold"
                         />
                       </div>
@@ -375,10 +431,115 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
                           type="tel"
                           required
                           onChange={(e) => setTeacherPhone(e.target.value)}
-                          placeholder={teacherPhone}
+                          placeholder="081234567890"
                           className="w-full bg-[#fffaf0] border-2 border-[#0a0a0a]/15 rounded-xl px-3 py-2 text-sm font-semibold"
                         />
                       </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-[#0a0a0a] uppercase mb-1">Asal Sekolah</label>
+                        <input
+                          type="text"
+                          required
+                          onChange={(e) => setSchool(e.target.value)}
+                          placeholder="cth. SMAN 1 Cirebon"
+                          className="w-full bg-[#fffaf0] border-2 border-[#0a0a0a]/15 rounded-xl px-3 py-2 text-sm font-semibold"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 bg-[#f8f3e9] border border-[#0a0a0a]/10 p-2.5 rounded-xl w-full">
+                      <span className="material-symbols-outlined text-[#e8b94a] text-[20px] shrink-0">info</span>
+                      <p className="text-[11px] font-bold text-[#6a6a6a] leading-tight">
+                        ID siswa dan Password akan dikirim otomatis ke email guru di atas.
+                      </p>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-xs font-bold text-[#0a0a0a] uppercase tracking-wider">
+                          Data Siswa Peserta
+                        </label>
+                        <span className="text-[10px] font-bold text-[#6a6a6a] bg-[#0a0a0a]/5 px-2 py-1 rounded-md">
+                          Maksimal 3 Siswa
+                        </span>
+                      </div>
+                      
+                      {studentsList.map((student, index) => (
+                        <div key={student.id} className="bg-[#fffaf0] p-4 rounded-2xl border-2 border-[#0a0a0a]/10 relative">
+                          <div className="absolute -top-3 -left-3 w-6 h-6 bg-[#0a0a0a] text-white rounded-full flex items-center justify-center text-xs font-black">
+                            {index + 1}
+                          </div>
+                          
+                          {studentsList.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeStudent(student.id)}
+                              className="absolute top-2 right-2 w-7 h-7 bg-[#ff6b5a]/10 text-[#ff6b5a] hover:bg-[#ff6b5a] hover:text-white rounded-lg flex items-center justify-center transition-colors"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">close</span>
+                            </button>
+                          )}
+
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+                            <div>
+                              <label className="block text-[10px] font-bold text-[#6a6a6a] uppercase mb-1">Nama Siswa</label>
+                              <input
+                                type="text"
+                                required
+                                value={student.name}
+                                onChange={(e) => updateStudent(student.id, 'name', e.target.value)}
+                                placeholder="cth. Budi"
+                                className="w-full bg-white border border-[#0a0a0a]/15 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:border-[#0a0a0a]"
+                              />
+                            </div>
+                            <div className="relative">
+                              <label className="block text-[10px] font-bold text-[#6a6a6a] uppercase mb-1">Kategori</label>
+                              <div className="relative">
+                                <select
+                                  value={student.category}
+                                  onChange={(e) => updateStudent(student.id, 'category', e.target.value)}
+                                  className="w-full bg-white border border-[#0a0a0a]/15 rounded-xl pl-3 pr-8 py-2 text-xs font-semibold focus:outline-none focus:border-[#0a0a0a] appearance-none cursor-pointer"
+                                >
+                                  <option value="SD">SD / MI</option>
+                                  <option value="SMP">SMP / MTs</option>
+                                  <option value="SMA">SMA / SMK / MA</option>
+                                </select>
+                                <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-[#6a6a6a] text-[18px]">
+                                  expand_more
+                                </span>
+                              </div>
+                            </div>
+                            <div className="relative">
+                              <label className="block text-[10px] font-bold text-[#6a6a6a] uppercase mb-1">Kelas</label>
+                              <div className="relative">
+                                <select
+                                  required
+                                  value={student.grade}
+                                  onChange={(e) => updateStudent(student.id, 'grade', e.target.value)}
+                                  className="w-full bg-white border border-[#0a0a0a]/15 rounded-xl pl-3 pr-8 py-2 text-xs font-semibold focus:outline-none focus:border-[#0a0a0a] appearance-none cursor-pointer"
+                                >
+                                  {student.category === 'SD' && sdGrades.map((g) => <option key={g} value={g}>{g}</option>)}
+                                  {student.category === 'SMP' && smpGrades.map((g) => <option key={g} value={g}>{g}</option>)}
+                                  {student.category === 'SMA' && smaGrades.map((g) => <option key={g} value={g}>{g}</option>)}
+                                </select>
+                                <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-[#6a6a6a] text-[18px]">
+                                  expand_more
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+
+                      {studentsList.length < 3 && (
+                        <button
+                          type="button"
+                          onClick={addStudent}
+                          className="w-full bg-[#f8f3e9] hover:bg-[#e7e2d8] text-[#0a0a0a] border-2 border-dashed border-[#0a0a0a]/20 py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">person_add</span>
+                          <span>Tambah Siswa</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}
@@ -494,6 +655,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
               )}
             </button>
           </form>
+          )}
         </div>
       </div>
     </div>

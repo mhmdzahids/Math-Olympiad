@@ -17,6 +17,15 @@ export const QuizTutorialModal: React.FC<QuizTutorialModalProps> = ({
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
 
+  React.useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const steps = [

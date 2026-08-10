@@ -9,6 +9,24 @@ interface AdminParticipantDetailViewProps {
   onShowToast?: (message: string, type?: 'success' | 'info' | 'warning', title?: string) => void;
 }
 
+const getQuestionPoints = (q: any, isCorrect: boolean, category: string) => {
+  const optionsObj = Array.isArray(q.options)
+    ? q.options.reduce((acc: any, cur: any) => ({ ...acc, [cur.key]: cur.text }), {})
+    : (q.options as Record<string, string> || {});
+  const isPg = Object.keys(optionsObj).length > 0;
+  const isSma = category.toLowerCase() === 'sma';
+
+  if (!isSma) {
+    return isCorrect ? 4 : -1;
+  } else {
+    if (isPg) {
+      return isCorrect ? 3 : -1;
+    } else {
+      return isCorrect ? 5 : 0;
+    }
+  }
+};
+
 export const AdminParticipantDetailView: React.FC<AdminParticipantDetailViewProps> = ({
   participantId,
   onNavigate,
@@ -138,6 +156,29 @@ export const AdminParticipantDetailView: React.FC<AdminParticipantDetailViewProp
     return true;
   });
 
+  let totalCorrect = 0;
+  let totalIncorrect = 0;
+  let pointsPos = 0;
+  let pointsNeg = 0;
+
+  submission_breakdown.forEach((q) => {
+    if (q.status === 'correct') {
+      totalCorrect++;
+      pointsPos += getQuestionPoints(q, true, participant.category);
+    } else if (q.status === 'incorrect') {
+      totalIncorrect++;
+      pointsNeg += getQuestionPoints(q, false, participant.category);
+    }
+  });
+
+  const switches = activeRoundSummary?.tab_switches || 0;
+  let penalty = 0;
+  if (switches === 1) penalty = -2;
+  else if (switches === 2) penalty = -5;
+  else if (switches >= 3) penalty = -10;
+
+  const calculatedScore = pointsPos + pointsNeg + penalty;
+
   const correctCount = submission_breakdown.filter((q) => q.status === 'correct').length;
   const incorrectCount = submission_breakdown.filter((q) => q.status === 'incorrect').length;
   const unansweredCount = submission_breakdown.filter((q) => q.status === 'unanswered').length;
@@ -145,7 +186,7 @@ export const AdminParticipantDetailView: React.FC<AdminParticipantDetailViewProp
   return (
     <div className="w-full bg-[#fef9ef] min-h-screen pb-32 pt-6">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-        
+
         {/* ── Top Header Title Bar ── */}
         <div className="flex items-center gap-3">
           <button
@@ -173,23 +214,21 @@ export const AdminParticipantDetailView: React.FC<AdminParticipantDetailViewProp
                   key={r.round_id}
                   type="button"
                   onClick={() => handleSelectRound(r.round_id)}
-                  className={`pb-3 px-2 flex items-center gap-2.5 transition-all cursor-pointer whitespace-nowrap border-b-4 font-extrabold text-sm ${
-                    isSelected
-                      ? 'border-[#0a0a0a] text-[#0a0a0a]'
-                      : 'border-transparent text-[#6a6a6a] hover:text-[#0a0a0a]'
-                  }`}
+                  className={`pb-3 px-2 flex items-center gap-2.5 transition-all cursor-pointer whitespace-nowrap border-b-4 font-extrabold text-sm ${isSelected
+                    ? 'border-[#0a0a0a] text-[#0a0a0a]'
+                    : 'border-transparent text-[#6a6a6a] hover:text-[#0a0a0a]'
+                    }`}
                 >
                   <span>{r.round_name}</span>
-                  
+
                   {/* Round Score & Status Pill Badge */}
                   <span
-                    className={`text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full border ${
-                      r.qualification_status === 'qualified'
-                        ? 'bg-[#a4d4c5]/40 text-[#0f5236] border-[#0f5236]/20'
-                        : r.qualification_status === 'disqualified'
+                    className={`text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full border ${r.qualification_status === 'qualified'
+                      ? 'bg-[#a4d4c5]/40 text-[#0f5236] border-[#0f5236]/20'
+                      : r.qualification_status === 'disqualified'
                         ? 'bg-[#ffdad6] text-[#ba1a1a] border-[#ba1a1a]/20'
                         : 'bg-[#ebe6d6] text-[#6a6a6a] border-[#0a0a0a]/10'
-                    }`}
+                      }`}
                   >
                     SKOR: {r.has_session ? r.score : '-'} • {qualLabel}
                   </span>
@@ -201,10 +240,10 @@ export const AdminParticipantDetailView: React.FC<AdminParticipantDetailViewProp
 
         {/* ── Main Two-Column Grid Layout ── */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          
+
           {/* ──── LEFT COLUMN (Profile Card & Round Analysis) ──── */}
           <div className="lg:col-span-4 space-y-6">
-            
+
             {/* Card 1: Profile Card */}
             <div className="clay-card bg-white p-6 rounded-[28px] border-2 border-[#0a0a0a]/15 clay-shadow flex flex-col items-center text-center relative overflow-hidden">
               <div className="w-20 h-20 rounded-2xl bg-[#b8a4ed] border-2 border-[#0a0a0a] text-white flex items-center justify-center font-black text-3xl mb-3 clay-shadow-sm">
@@ -261,19 +300,18 @@ export const AdminParticipantDetailView: React.FC<AdminParticipantDetailViewProp
                   <div className="bg-[#f8f3e9] p-4 rounded-2xl border border-[#0a0a0a]/10 text-center space-y-1">
                     <span className="text-[10px] font-black uppercase text-[#6a6a6a] tracking-wider block">STATUS</span>
                     <span
-                      className={`text-sm font-black uppercase block ${
-                        activeRoundSummary.qualification_status === 'qualified'
-                          ? 'text-[#0f5236]'
-                          : activeRoundSummary.qualification_status === 'disqualified'
+                      className={`text-sm font-black uppercase block ${activeRoundSummary.qualification_status === 'qualified'
+                        ? 'text-[#0f5236]'
+                        : activeRoundSummary.qualification_status === 'disqualified'
                           ? 'text-[#ba1a1a]'
                           : 'text-[#e8b94a]'
-                      }`}
+                        }`}
                     >
                       {activeRoundSummary.qualification_status === 'qualified'
                         ? 'LOLOS'
                         : activeRoundSummary.qualification_status === 'disqualified'
-                        ? 'TIDAK LOLOS'
-                        : 'PENDING'}
+                          ? 'TIDAK LOLOS'
+                          : 'PENDING'}
                     </span>
                   </div>
                 </div>
@@ -319,6 +357,33 @@ export const AdminParticipantDetailView: React.FC<AdminParticipantDetailViewProp
                   );
                 })()}
 
+                {/* Scoring Breakdown Box */}
+                {activeRoundSummary.has_session && (
+                  <div className="p-4 rounded-2xl border-2 border-[#0a0a0a]/10 bg-[#f8f3e9] space-y-3">
+                    <h4 className="font-black text-xs text-[#0a0a0a] uppercase tracking-wider border-b border-[#0a0a0a]/10 pb-2">Kalkulasi Nilai Akhir</h4>
+                    <div className="space-y-1 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-[#6a6a6a] font-bold">Benar ({totalCorrect} soal)</span>
+                        <span className="text-[#0f5236] font-black">+{pointsPos}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-[#6a6a6a] font-bold">Salah ({totalIncorrect} soal)</span>
+                        <span className="text-[#ba1a1a] font-black">{pointsNeg}</span>
+                      </div>
+                      {penalty < 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-[#ba1a1a] font-bold">Penalti Pindah Tab ({switches}x)</span>
+                          <span className="text-[#ba1a1a] font-black">{penalty}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between pt-2 border-t border-[#0a0a0a]/10">
+                        <span className="text-[#0a0a0a] font-black">Total Skor Akhir</span>
+                        <span className="text-[#0a0a0a] font-black">{calculatedScore}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {activeRoundSummary.has_session && (
                   <button
                     type="button"
@@ -339,9 +404,9 @@ export const AdminParticipantDetailView: React.FC<AdminParticipantDetailViewProp
 
           {/* ──── RIGHT COLUMN (Submission Breakdown) ──── */}
           <div className="lg:col-span-8 space-y-6">
-            
+
             <div className="clay-card bg-[#f8f3e9] p-6 rounded-[28px] border-2 border-[#0a0a0a]/15 clay-shadow space-y-4">
-              
+
               {/* Header & Mini Filters */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#0a0a0a]/10 pb-3">
                 <h3 className="text-xs font-black uppercase text-[#6a6a6a] tracking-wider">
@@ -352,27 +417,24 @@ export const AdminParticipantDetailView: React.FC<AdminParticipantDetailViewProp
                   <button
                     type="button"
                     onClick={() => setQuestionFilter('all')}
-                    className={`px-3 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${
-                      questionFilter === 'all' ? 'bg-[#0a0a0a] text-white' : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
-                    }`}
+                    className={`px-3 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${questionFilter === 'all' ? 'bg-[#0a0a0a] text-white' : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
+                      }`}
                   >
                     Semua ({submission_breakdown.length})
                   </button>
                   <button
                     type="button"
                     onClick={() => setQuestionFilter('correct')}
-                    className={`px-3 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${
-                      questionFilter === 'correct' ? 'bg-[#0f5236] text-white' : 'text-[#0f5236]'
-                    }`}
+                    className={`px-3 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${questionFilter === 'correct' ? 'bg-[#0f5236] text-white' : 'text-[#0f5236]'
+                      }`}
                   >
                     Benar ({correctCount})
                   </button>
                   <button
                     type="button"
                     onClick={() => setQuestionFilter('incorrect')}
-                    className={`px-3 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${
-                      questionFilter === 'incorrect' ? 'bg-[#ba1a1a] text-white' : 'text-[#ba1a1a]'
-                    }`}
+                    className={`px-3 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${questionFilter === 'incorrect' ? 'bg-[#ba1a1a] text-white' : 'text-[#ba1a1a]'
+                      }`}
                   >
                     Salah ({incorrectCount})
                   </button>
@@ -396,8 +458,10 @@ export const AdminParticipantDetailView: React.FC<AdminParticipantDetailViewProp
                   {filteredQuestions.map((q) => {
                     const isExpanded = expandedQuestionId === q.question_id;
                     const optionsObj: Record<string, string> = Array.isArray(q.options)
-                      ? q.options.reduce((acc, cur) => ({ ...acc, [cur.key]: cur.text }), {})
-                      : (q.options as Record<string, string>);
+                      ? q.options.reduce((acc: any, cur: any) => ({ ...acc, [cur.key]: cur.text }), {})
+                      : (q.options as Record<string, string> || {});
+
+                    const hasOptions = Object.keys(optionsObj).length > 0;
 
                     return (
                       <div
@@ -412,26 +476,25 @@ export const AdminParticipantDetailView: React.FC<AdminParticipantDetailViewProp
                           <div className="flex items-center gap-3">
                             {/* Number Circle Badge */}
                             <div
-                              className={`w-9 h-9 rounded-full flex items-center justify-center font-black text-sm shrink-0 border ${
-                                q.status === 'correct'
-                                  ? 'bg-[#a4d4c5] text-[#0f5236] border-[#0f5236]/30'
-                                  : q.status === 'incorrect'
+                              className={`w-9 h-9 rounded-full flex items-center justify-center font-black text-sm shrink-0 border ${q.status === 'correct'
+                                ? 'bg-[#a4d4c5] text-[#0f5236] border-[#0f5236]/30'
+                                : q.status === 'incorrect'
                                   ? 'bg-[#ffdad6] text-[#ba1a1a] border-[#ba1a1a]/30'
                                   : 'bg-[#ebe6d6] text-[#6a6a6a] border-[#0a0a0a]/10'
-                              }`}
+                                }`}
                             >
                               {q.number}
                             </div>
 
                             <div>
                               <div className="font-black text-sm text-[#0a0a0a] line-clamp-1">
-                                Soal #{q.number}
+                                Soal #{q.number} {hasOptions ? '' : '(ISIAN)'}
                               </div>
                               <div className="text-[11px] font-bold uppercase tracking-wider flex items-center gap-2 mt-0.5">
                                 {q.status === 'correct' ? (
-                                  <span className="text-[#0f5236]">BENAR • 10 POIN</span>
+                                  <span className="text-[#0f5236]">BENAR • {getQuestionPoints(q, true, participant.category)} POIN</span>
                                 ) : q.status === 'incorrect' ? (
-                                  <span className="text-[#ba1a1a]">SALAH • 0 POIN</span>
+                                  <span className="text-[#ba1a1a]">SALAH • {getQuestionPoints(q, false, participant.category)} POIN</span>
                                 ) : (
                                   <span className="text-[#6a6a6a]">TIDAK DIJAWAB • 0 POIN</span>
                                 )}
@@ -466,36 +529,64 @@ export const AdminParticipantDetailView: React.FC<AdminParticipantDetailViewProp
                               </div>
                             )}
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
-                              {['A', 'B', 'C', 'D'].map((key) => {
-                                const optText = optionsObj[key] || '';
-                                const isStudentChoice = q.submitted_answer?.toUpperCase() === key;
-                                const isCorrectKey = q.correct_answer.toUpperCase() === key;
+                            {hasOptions ? (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
+                                {['A', 'B', 'C', 'D'].map((key) => {
+                                  const optText = optionsObj[key] || '';
+                                  const isStudentChoice = q.submitted_answer?.toUpperCase() === key;
+                                  const isCorrectKey = q.correct_answer.toUpperCase() === key;
 
-                                let style = 'bg-white border-[#0a0a0a]/15 text-[#0a0a0a]';
-                                if (isStudentChoice && isCorrectKey) {
-                                  style = 'bg-[#a4d4c5] border-[#0f5236] font-bold text-[#0f5236]';
-                                } else if (isStudentChoice && !isCorrectKey) {
-                                  style = 'bg-[#ffdad6] border-[#ba1a1a] font-bold text-[#ba1a1a]';
-                                } else if (isCorrectKey) {
-                                  style = 'bg-white border-2 border-[#0f5236] font-bold text-[#0f5236]';
-                                }
+                                  let style = 'bg-white border-[#0a0a0a]/15 text-[#0a0a0a]';
+                                  if (isStudentChoice && isCorrectKey) {
+                                    style = 'bg-[#a4d4c5] border-[#0f5236] font-bold text-[#0f5236]';
+                                  } else if (isStudentChoice && !isCorrectKey) {
+                                    style = 'bg-[#ffdad6] border-[#ba1a1a] font-bold text-[#ba1a1a]';
+                                  } else if (isCorrectKey) {
+                                    style = 'bg-white border-2 border-[#0f5236] font-bold text-[#0f5236]';
+                                  }
 
-                                return (
-                                  <div key={key} className={`p-3 rounded-xl border flex items-start gap-2 text-xs ${style}`}>
-                                    <span className="font-black shrink-0">{key}.</span>
-                                    <div className="flex-1">
-                                      <MathText text={optText} />
+                                  return (
+                                    <div key={key} className={`p-3 rounded-xl border flex items-start gap-2 text-xs ${style}`}>
+                                      <span className="font-black shrink-0">{key}.</span>
+                                      <div className="flex-1">
+                                        <MathText text={optText} />
+                                      </div>
+                                      {isStudentChoice && (
+                                        <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-[#0a0a0a] text-white shrink-0">
+                                          Jawaban Peserta
+                                        </span>
+                                      )}
                                     </div>
-                                    {isStudentChoice && (
-                                      <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-[#0a0a0a] text-white shrink-0">
-                                        Jawaban Peserta
-                                      </span>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                                <div className="p-4 rounded-xl border-2 border-[#0f5236]/30 bg-[#a4d4c5]/20 flex flex-col gap-1.5 text-xs">
+                                  <span className="text-[10px] font-black uppercase tracking-wider text-[#0f5236]">Jawaban Benar</span>
+                                  <div className="font-bold text-[#0f5236] text-sm">
+                                    <MathText text={q.correct_answer} />
+                                  </div>
+                                </div>
+                                <div className={`p-4 rounded-xl border-2 flex flex-col gap-1.5 text-xs ${q.status === 'correct'
+                                  ? 'border-[#0f5236] bg-[#a4d4c5]'
+                                  : q.status === 'incorrect'
+                                    ? 'border-[#ba1a1a] bg-[#ffdad6]'
+                                    : 'border-[#0a0a0a]/20 bg-white'
+                                  }`}>
+                                  <span className={`text-[10px] font-black uppercase tracking-wider ${q.status === 'correct' ? 'text-[#0f5236]' : q.status === 'incorrect' ? 'text-[#ba1a1a]' : 'text-[#6a6a6a]'
+                                    }`}>Jawaban Peserta</span>
+                                  <div className={`font-bold text-sm ${q.status === 'correct' ? 'text-[#0f5236]' : q.status === 'incorrect' ? 'text-[#ba1a1a]' : 'text-[#0a0a0a]'
+                                    }`}>
+                                    {q.submitted_answer ? (
+                                      <MathText text={q.submitted_answer} />
+                                    ) : (
+                                      <span className="text-[#6a6a6a] italic">Tidak dijawab</span>
                                     )}
                                   </div>
-                                );
-                              })}
-                            </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -515,7 +606,7 @@ export const AdminParticipantDetailView: React.FC<AdminParticipantDetailViewProp
       {/* ── Bottom Sticky Action Bar ── */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-[#0a0a0a]/15 p-4 z-40 clay-shadow">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          
+
           {/* Left Info Text */}
           <div className="flex items-center gap-2 text-xs text-[#6a6a6a] font-semibold">
             <span className="material-symbols-outlined text-base text-[#e8b94a]">info</span>

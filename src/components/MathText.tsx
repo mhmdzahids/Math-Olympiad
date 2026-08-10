@@ -1,5 +1,6 @@
 import React from 'react';
 import katex from 'katex';
+import DOMPurify from 'dompurify';
 
 interface MathTextProps {
   text?: string;
@@ -107,12 +108,13 @@ export const MathText: React.FC<MathTextProps> = ({ text, className = '', inline
 
         const isBlock = chunk.type === 'block-math';
         const html = renderKaTeX(chunk.content, isBlock);
+        const cleanHtml = DOMPurify.sanitize(html);
 
         return (
           <span
             key={idx}
             className={isBlock ? 'my-3 block text-center' : 'inline-block px-0.5'}
-            dangerouslySetInnerHTML={{ __html: html }}
+            dangerouslySetInnerHTML={{ __html: cleanHtml }}
           />
         );
       })}

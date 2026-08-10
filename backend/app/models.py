@@ -100,9 +100,11 @@ class Participant(Base):
     category = Column(Enum(Category), nullable=False)
     grade = Column(String, nullable=True)  # kelas
     phone = Column(String, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=False)  # Harus diaktivasi admin sebelum bisa quiz
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     user = relationship("User", back_populates="participant")
+
 
 
 class Round(Base):
@@ -154,8 +156,9 @@ class Question(Base):
     round_id = Column(GUID, ForeignKey("rounds.id"), nullable=False)
     category = Column(Enum(Category), nullable=False)
     question_text = Column(Text, nullable=False)
-    options = Column(JSON, nullable=False)  # {"A": "...", "B": "...", "C": "...", "D": "..."}
-    correct_answer = Column(String, nullable=False)  # "A" / "B" / "C" / "D" — JANGAN pernah di-expose ke peserta
+    question_type = Column(String, nullable=False, default="PG")  # "PG" atau "ISIAN"
+    options = Column(JSON, nullable=True)  # Nullable for ISIAN
+    correct_answer = Column(String, nullable=False)  # "A", "B", atau teks jawaban isian
     image_url = Column(String, nullable=True)  # untuk soal bergambar/rumus kompleks
     order_index = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

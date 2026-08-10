@@ -52,8 +52,8 @@ export function parseQuestionText(rawText: string): ParsedQuestion[] {
   };
 
   const isKeyLine = (line: string) => {
-    // Matches "Kunci:", "Jawaban:", "Kunci Jawaban:", "Answer:", "Key:"
-    return /^(?:Kunci(?:\s*Jawaban)?|Jawaban|Answer|Key)\s*[:=]\s*([A-[#Ea-e])/i.test(line);
+    // Matches "Kunci: A" or "Kunci: 100 cm"
+    return /^(?:Kunci(?:\s*Jawaban)?|Jawaban|Answer|Key)\s*[:=]\s*(.+)/i.test(line);
   };
 
   const finalizeQuestion = () => {
@@ -66,24 +66,22 @@ export function parseQuestionText(rawText: string): ParsedQuestion[] {
     if (!qText) {
       isError = true;
       errorMessage = 'Teks soal kosong atau tidak dapat terbaca.';
-    } else if (currentOptions.length < 2) {
+    } else if (currentOptions.length > 0 && currentOptions.length < 2) {
       isError = true;
-      errorMessage = 'Pilihan jawaban kurang dari 2 opsi (minimal A dan B).';
+      errorMessage = 'Soal Pilihan Ganda harus memiliki minimal 2 opsi (A dan B).';
     } else if (!currentKey) {
       isError = true;
-      errorMessage = 'Kunci jawaban tidak ditemukan (format: Kunci: B).';
+      errorMessage = 'Kunci jawaban tidak ditemukan (format: Kunci: [Jawaban]).';
     }
+
+    const qType = currentOptions.length === 0 ? 'ISIAN' : 'PG';
 
     questions.push({
       id: `Q${String(questionCounter).padStart(2, '0')}`,
       questionText: qText || 'Teks Soal Tidak Terurai',
-      options: currentOptions.length > 0 ? currentOptions : [
-        { key: 'A', text: 'Pilihan A' },
-        { key: 'B', text: 'Pilihan B' },
-        { key: 'C', text: 'Pilihan C' },
-        { key: 'D', text: 'Pilihan D' }
-      ],
-      key: currentKey || 'A',
+      questionType: qType,
+      options: currentOptions.length > 0 ? currentOptions : undefined,
+      key: currentKey || '',
       isError,
       errorMessage: isError ? errorMessage : undefined,
     });
@@ -108,9 +106,17 @@ export function parseQuestionText(rawText: string): ParsedQuestion[] {
         currentOptions.push({ key: optKey, text: optText });
       }
     } else if (isKeyLine(line)) {
-      const match = line.match(/^(?:Kunci(?:\s*Jawaban)?|Jawaban|Answer|Key)\s*[:=]\s*([A-Ea-e])/i);
+      const match = line.match(/^(?:Kunci(?:\s*Jawaban)?|Jawaban|Answer|Key)\s*[:=]\s*(.+)/i);
       if (match) {
-        currentKey = match[1].toUpperCase();
+        // Jika opsi belum ada (berarti isian), kita ambil seluruh string.
+        // Jika opsi sudah ada (berarti PG), kita ambil huruf pertamanya saja.
+        const rawKey = match[1].trim();
+        if (currentOptions.length > 0) {
+          // Ambil karakter pertama (A/B/C/D)
+          currentKey = rawKey.charAt(0).toUpperCase();
+        } else {
+          currentKey = rawKey;
+        }
       }
     } else {
       // If we are currently collecting question text (before options start)
@@ -161,8 +167,8 @@ export function generateSampleTemplateText(): string {
 ===============================================
 Petunjuk:
 1. Setiap soal diawali dengan nomor soal (contoh: 1. atau Soal 1:)
-2. Pilihan jawaban diawali dengan A., B., C., D. (atau a., b., c., d.)
-3. Kunci jawaban diawali dengan "Kunci: X" atau "Jawaban: X"
+2. [Pilihan Ganda] Pilihan jawaban diawali dengan A., B., C., D. Kunci jawaban: "Kunci: A"
+3. [Isian Singkat] JANGAN tuliskan pilihan jawaban. Langsung tulis "Kunci: [Teks Jawaban Anda]"
 
 --- CONTOH SOAL ---
 
@@ -173,25 +179,18 @@ C. 54
 D. 99
 Kunci: A
 
-2. Jika x + 5 = 12, maka nilai x^2 - 10 adalah ...
-A. 39
-B. 49
-C. 59
-D. 69
-Kunci: C
-
-3. Diberikan sebuah segitiga siku-siku dengan panjang alas 6 cm dan tinggi 8 cm. Berapakah panjang sisi miringnya?
+2. Diberikan sebuah segitiga siku-siku dengan panjang alas 6 cm dan tinggi 8 cm. Berapakah panjang sisi miringnya?
 A. 9 cm
 B. 10 cm
 C. 12 cm
 D. 14 cm
 Kunci: B
 
+3. (Contoh Soal Isian Singkat - Tanpa Opsi)
+Jika volume kubus adalah 64 cm^3, berapakah panjang sisinya?
+Kunci: 4 cm
+
 4. Suatu deret aritmatika memiliki suku pertama a = 4 dan beda b = 3. Berapakah suku ke-10 (U10)?
-A. 31
-B. 34
-C. 37
-D. 40
-Kunci: A
+Kunci: 31
 `;
 }

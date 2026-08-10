@@ -26,6 +26,26 @@ class RegisterRequest(BaseModel):
     phone: Optional[str] = None
 
 
+class AdminRegisterRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8, description="Minimal 8 karakter")
+    full_name: str
+    pin_code: str
+
+
+class StudentCollectiveData(BaseModel):
+    name: str
+    category: Category
+    grade: str
+
+
+class RegisterCollectiveRequest(BaseModel):
+    teacher_email: EmailStr
+    teacher_name: str
+    school_name: str
+    students: list[StudentCollectiveData]
+
+
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
@@ -124,7 +144,8 @@ class QuestionOptionSchema(BaseModel):
 
 class QuestionCreate(BaseModel):
     question_text: str
-    options: list[QuestionOptionSchema]
+    question_type: str = "PG"
+    options: Optional[list[QuestionOptionSchema]] = None
     correct_key: str
     image_url: Optional[str] = None
     points: Optional[int] = 10
@@ -134,7 +155,8 @@ class QuestionOut(BaseModel):
     id: str
     round_id: str
     question_text: str
-    options: list[QuestionOptionSchema]
+    question_type: str = "PG"
+    options: Optional[list[QuestionOptionSchema]] = None
     correct_key: str
     image_url: Optional[str] = None
     points: int = 10
@@ -149,7 +171,8 @@ class QuestionStudentOut(BaseModel):
     id: str
     round_id: str
     question_text: str
-    options: list[QuestionOptionSchema]
+    question_type: str = "PG"
+    options: Optional[list[QuestionOptionSchema]] = None
     image_url: Optional[str] = None
     points: int = 10
 
