@@ -123,7 +123,15 @@ class ApiService {
 
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData.detail || 'Registrasi gagal.');
+      let errMsg = 'Registrasi gagal.';
+      if (typeof errorData.detail === 'string') {
+        errMsg = errorData.detail;
+      } else if (Array.isArray(errorData.detail)) {
+        errMsg = errorData.detail.map((e: any) => e.msg).join(', ');
+      } else if (errorData.detail) {
+        errMsg = JSON.stringify(errorData.detail);
+      }
+      throw new Error(errMsg);
     }
 
     return res.json();
