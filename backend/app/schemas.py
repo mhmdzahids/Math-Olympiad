@@ -26,6 +26,13 @@ class RegisterRequest(BaseModel):
     phone: Optional[str] = None
 
 
+class AdminRegisterRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8, description="Minimal 8 karakter")
+    full_name: str
+    pin_code: str
+
+
 class StudentCollectiveData(BaseModel):
     name: str
     category: Category

@@ -859,6 +859,14 @@ def submit_quiz_answers(
                     if clean_ans:
                         score += 3 if is_correct else -1
 
+    # Terapkan penalti keamanan (Tab Switches) sesuai Rulebook
+    if session.tab_switch_count == 1:
+        score -= 2
+    elif session.tab_switch_count == 2:
+        score -= 5
+    elif session.tab_switch_count >= 3:
+        score -= 10
+
     session.score = score
     if session.status == SessionStatus.in_progress:
         session.status = SessionStatus.completed

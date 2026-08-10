@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import User, Participant, UserRole
-from app.schemas import RegisterRequest, TokenResponse, UserOut, RegisterCollectiveRequest
+from app.schemas import RegisterRequest, TokenResponse, UserOut, RegisterCollectiveRequest, AdminRegisterRequest
 from app.security import hash_password, verify_password, create_access_token, get_current_user
 from app.limiter import limiter
 from app.config import settings
@@ -56,6 +56,34 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
         phone=payload.phone,
     )
     db.add(participant)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.post("/admin/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+@limiter.limit("10/minute")
+def register_admin(request: Request, payload: AdminRegisterRequest, db: Session = Depends(get_db)):
+    if payload.pin_code != "060510":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="PIN Code tidak valid. Akses ditolak.",
+        )
+
+    existing = db.query(User).filter(User.email == payload.email).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email sudah terdaftar. Gunakan email lain.",
+        )
+
+    user = User(
+        email=payload.email,
+        password_hash=hash_password(payload.password),
+        role=UserRole.admin,
+    )
+    # Admin tidak dimasukkan ke tabel Participant (mengikuti instruksi)
+    db.add(user)
     db.commit()
     db.refresh(user)
     return user

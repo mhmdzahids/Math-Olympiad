@@ -149,6 +149,32 @@ class ApiService {
     return res.json();
   }
 
+  async createAdmin(payload: any): Promise<UserOut> {
+    const res = await fetch(`${API_BASE_URL}/auth/admin/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      let errMsg = 'Gagal membuat akun admin.';
+      if (typeof errorData.detail === 'string') {
+        errMsg = errorData.detail;
+      } else if (Array.isArray(errorData.detail)) {
+        errMsg = errorData.detail.map((e: any) => e.msg).join(', ');
+      } else if (errorData.detail) {
+        errMsg = JSON.stringify(errorData.detail);
+      }
+      throw new Error(errMsg);
+    }
+
+    return res.json();
+  }
+
+
   async registerCollective(payload: RegisterCollectivePayload): Promise<{message: string, students_count: number}> {
     try {
       const res = await fetch(`${API_BASE_URL}/auth/register_collective`, {

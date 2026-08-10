@@ -78,6 +78,13 @@ export const AdminAccountManagerView: React.FC<AdminAccountManagerViewProps> = (
   const [deleteTarget, setDeleteTarget] = useState<ParticipantAccount | null>(null);
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
 
+  const [pinModalOpen, setPinModalOpen] = useState(false);
+  const [pinInput, setPinInput] = useState("");
+
+  const [createAdminModalOpen, setCreateAdminModalOpen] = useState(false);
+  const [adminForm, setAdminForm] = useState({ full_name: "", email: "", password: "" });
+  const [isCreatingAdmin, setIsCreatingAdmin] = useState(false);
+
   const loadAccounts = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -92,7 +99,7 @@ export const AdminAccountManagerView: React.FC<AdminAccountManagerViewProps> = (
 
   useEffect(() => { loadAccounts(); }, [loadAccounts]);
 
-  const isModalOpen = !!editModal || createModalOpen || !!deleteTarget;
+  const isModalOpen = !!editModal || createModalOpen || !!deleteTarget || pinModalOpen || createAdminModalOpen;
   useEffect(() => {
     if (isModalOpen) {
       document.body.style.overflow = "hidden";
@@ -163,6 +170,37 @@ export const AdminAccountManagerView: React.FC<AdminAccountManagerViewProps> = (
     }
   };
 
+  const handlePinSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pinInput === "060510") {
+      setPinModalOpen(false);
+      setPinInput("");
+      setCreateAdminModalOpen(true);
+    } else {
+      onShowToast?.("PIN Code salah!", "warning", "Akses Ditolak");
+    }
+  };
+
+  const handleCreateAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsCreatingAdmin(true);
+    try {
+      await apiService.createAdmin({
+        email: adminForm.email,
+        password: adminForm.password,
+        full_name: adminForm.full_name,
+        pin_code: "060510",
+      });
+      onShowToast?.(`Akun Admin ${adminForm.full_name} berhasil dibuat!`, "success", "Berhasil");
+      setCreateAdminModalOpen(false);
+      setAdminForm({ full_name: "", email: "", password: "" });
+    } catch (err: any) {
+      onShowToast?.(err.message || "Gagal membuat akun admin.", "warning", "Error");
+    } finally {
+      setIsCreatingAdmin(false);
+    }
+  };
+
   const handleDeleteConfirm = async () => {
     if (!deleteTarget) return;
     setIsDeletingId(deleteTarget.id);
@@ -204,6 +242,11 @@ export const AdminAccountManagerView: React.FC<AdminAccountManagerViewProps> = (
             </div>
           </div>
           <div className="flex gap-2 shrink-0 flex-wrap justify-end">
+            <button type="button" onClick={() => setPinModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-white border-2 border-[#0a0a0a] rounded-2xl font-bold text-sm text-[#0a0a0a] hover:bg-[#f5f0e0] transition-all cursor-pointer clay-shadow-sm clay-button-active">
+              <span className="material-symbols-outlined text-[18px]">admin_panel_settings</span>
+              <span className="hidden sm:inline">Tambah Admin</span>
+            </button>
             <button type="button" onClick={() => setCreateModalOpen(true)}
               className="flex items-center gap-2 px-4 py-2.5 bg-[#0a0a0a] border-2 border-[#0a0a0a] rounded-2xl font-bold text-sm text-white hover:bg-[#1a1a1a] transition-all cursor-pointer clay-shadow-sm clay-button-active">
               <span className="material-symbols-outlined text-[18px]">person_add</span>
@@ -459,6 +502,89 @@ export const AdminAccountManagerView: React.FC<AdminAccountManagerViewProps> = (
                 {isDeletingId === deleteTarget.id ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><span className="material-symbols-outlined text-[16px]">delete</span>Ya, Hapus Akun</>}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin PIN Verification Modal */}
+      {pinModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-[#0a0a0a]/60 backdrop-blur-xs" onClick={() => setPinModalOpen(false)} />
+          <div className="relative bg-[#fef9ef] max-w-sm w-full rounded-[32px] border-2 border-[#0a0a0a]/15 shadow-2xl z-10 p-6 space-y-4 animate-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 rounded-3xl bg-[#0a0a0a]/10 border-2 border-[#0a0a0a] flex items-center justify-center mx-auto">
+              <span className="material-symbols-outlined text-3xl text-[#0a0a0a]">lock</span>
+            </div>
+            <div className="text-center">
+              <h3 className="text-xl font-black text-[#0a0a0a]">Verifikasi PIN</h3>
+              <p className="text-sm font-bold text-[#6a6a6a] mt-1">Masukkan PIN untuk menambah admin baru.</p>
+            </div>
+            <form onSubmit={handlePinSubmit} className="space-y-4">
+              <input 
+                type="password" 
+                maxLength={6}
+                value={pinInput} 
+                onChange={(e) => setPinInput(e.target.value)}
+                placeholder="XXXXXX" 
+                className="w-full bg-white border-2 border-[#0a0a0a]/20 rounded-xl px-4 py-3 text-center text-xl font-black tracking-widest outline-none focus:border-[#0a0a0a]"
+                autoFocus
+              />
+              <div className="flex gap-3">
+                <button type="button" onClick={() => setPinModalOpen(false)} className="flex-1 py-3 rounded-2xl border-2 border-[#0a0a0a]/15 bg-[#f5f0e0] font-bold text-sm text-[#0a0a0a] hover:bg-[#ebe6d6] cursor-pointer">Batal</button>
+                <button type="submit" className="flex-1 py-3 rounded-2xl border-2 border-[#0a0a0a] bg-[#0a0a0a] font-bold text-sm text-white hover:bg-[#1a1a1a] cursor-pointer clay-button-active">Lanjut</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Create Admin Modal */}
+      {createAdminModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-[#0a0a0a]/60 backdrop-blur-xs" onClick={() => setCreateAdminModalOpen(false)} />
+          <div className="relative bg-[#fef9ef] max-w-md w-full rounded-[32px] border-2 border-[#0a0a0a]/15 shadow-2xl z-10 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b-2 border-[#0a0a0a]/10 bg-white flex justify-between items-center sticky top-0 z-20">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#0a0a0a]/5 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-[#0a0a0a]">admin_panel_settings</span>
+                </div>
+                <div>
+                  <h3 className="font-black text-[#0a0a0a] text-lg leading-tight">Buat Akun Admin</h3>
+                  <p className="text-xs font-bold text-[#6a6a6a]">Data akun admin baru</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setCreateAdminModalOpen(false)} className="w-8 h-8 rounded-full bg-[#f5f0e0] flex items-center justify-center text-[#0a0a0a] hover:bg-[#ebe6d6] cursor-pointer transition-colors">
+                <span className="material-symbols-outlined text-sm">close</span>
+              </button>
+            </div>
+            
+            <form onSubmit={handleCreateAdmin} className="p-6 overflow-y-auto space-y-4">
+              {[
+                { label: "Nama Lengkap", key: "full_name", type: "text", icon: "badge" },
+                { label: "Alamat Email", key: "email", type: "email", icon: "mail" },
+                { label: "Password (min. 8 karakter)", key: "password", type: "password", icon: "lock" }
+              ].map(({ label, key, type, icon }) => (
+                <div key={key}>
+                  <label className="text-[10px] font-black uppercase tracking-wider text-[#6a6a6a] mb-1 block">{label}</label>
+                  <div className="flex items-center gap-2 border-2 border-[#0a0a0a]/15 rounded-xl px-3 py-2 bg-white focus-within:border-[#0a0a0a] transition-colors">
+                    <span className="material-symbols-outlined text-[18px] text-[#6a6a6a] shrink-0">{icon}</span>
+                    <input 
+                      type={type} 
+                      value={adminForm[key as keyof typeof adminForm]} 
+                      onChange={(e) => setAdminForm((prev) => ({ ...prev, [key]: e.target.value }))} 
+                      className="flex-1 bg-transparent text-sm font-bold text-[#0a0a0a] outline-none" 
+                      placeholder={label} 
+                      required 
+                    />
+                  </div>
+                </div>
+              ))}
+              <div className="flex gap-3 pt-4">
+                <button type="button" onClick={() => setCreateAdminModalOpen(false)} className="flex-1 py-3 rounded-2xl border-2 border-[#0a0a0a]/15 bg-[#f5f0e0] font-bold text-sm text-[#0a0a0a] hover:bg-[#ebe6d6] cursor-pointer">Batal</button>
+                <button type="submit" disabled={isCreatingAdmin} className="flex-1 py-3 rounded-2xl border-2 border-[#0a0a0a] bg-[#0a0a0a] font-bold text-sm text-white hover:bg-[#1a1a1a] cursor-pointer clay-button-active disabled:opacity-50 flex items-center justify-center gap-2">
+                  {isCreatingAdmin ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Memproses...</> : <><span className="material-symbols-outlined text-[16px]">save</span>Simpan Admin</>}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
