@@ -1082,9 +1082,16 @@ def get_my_activation_status(
         Qualification.status == QualificationStatus.lolos
     ).first() is not None
 
+    # Cek apakah ada kualifikasi tidak lolos di babak manapun
+    has_failed_any_round = db.query(Qualification).filter(
+        Qualification.participant_id == participant.id,
+        Qualification.status == QualificationStatus.tidak_lolos
+    ).first() is not None
+
     return {
         "is_active": getattr(participant, 'is_active', False),
         "has_passed_any_round": has_passed_any_round,
+        "has_failed_any_round": has_failed_any_round,
         "participant_id": str(participant.id),
         "full_name": participant.full_name,
     }

@@ -24,6 +24,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isAccountActive, setIsAccountActive] = useState<boolean>(true); // default true to avoid flicker
   const [hasPassedAnyRound, setHasPassedAnyRound] = useState<boolean>(false);
+  const [hasFailedAnyRound, setHasFailedAnyRound] = useState<boolean>(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -59,6 +60,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
         if (!isMounted) return;
         setIsAccountActive(status.is_active);
         setHasPassedAnyRound(status.has_passed_any_round);
+        setHasFailedAnyRound(status.has_failed_any_round);
       } catch {
         setIsAccountActive(true); // fail open
       }
@@ -198,7 +200,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               OPTIMA MATRIX 2026 • PORTAL PESERTA
             </span>
             <h1 className="text-3xl sm:text-5xl font-bold text-[#0a0a0a] tracking-tight mb-2">
-              Selamat datang kembali, {studentName}!
+              Selamat datang kembali,<br></br> {studentName}!
             </h1>
             <p className="text-base text-[#6a6a6a] max-w-2xl">
               Siapkan diri Anda untuk mengikuti rangkaian babak Olimpiade Prestasi Matematika 2026 Se-Pulau Jawa.
@@ -345,7 +347,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                             Jadwal Ujian: <strong className="text-[#0a0a0a] font-black">{formatTanggalID(sDate, sTime)} s.d {formatTanggalID(eDate, eTime)}</strong>
                           </div>
 
-                              {!isOffline && (
+                          {!isOffline && (
                             <>
                               {isCompletedSession ? (
                                 <button
@@ -474,7 +476,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                     </div>
                     <h2 className="font-bold text-[18px] text-[#0a0a0a] tracking-tight">Status Akun</h2>
                   </div>
-                  
+
                   <div className="bg-[#ffe3dd] rounded-[20px] p-5 border-2 border-[#0a0a0a]/10">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="w-2 h-2 rounded-full bg-[#f59e0b] animate-pulse shrink-0" />
@@ -491,22 +493,51 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               </div>
             ) : hasPassedAnyRound ? (
               /* Qualification Status Card — shown after passing any round */
-              <div className="bg-[#ffdbca] rounded-2xl p-6 shadow-lg relative overflow-hidden group border-2 border-[#0a0a0a]/10 clay-shadow">
+              <div className="bg-[#a4d4c5] rounded-[28px] p-5 sm:p-6 shadow-lg relative overflow-hidden group border-2 border-[#0a0a0a] clay-shadow">
+                <div className="absolute -right-4 -top-4 w-32 h-32 bg-white/40 rounded-full blur-2xl group-hover:scale-110 transition-transform duration-500" />
                 <div className="relative z-10">
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="material-symbols-outlined text-[#8b4f2b]">campaign</span>
-                    <h2 className="font-bold text-base text-[#6e3816]">Status Kualifikasi</h2>
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className="w-10 h-10 rounded-[14px] bg-[#0a0a0a] flex items-center justify-center shrink-0 clay-shadow-sm">
+                      <span className="material-symbols-outlined text-[#a4d4c5] text-[20px]">workspace_premium</span>
+                    </div>
+                    <h2 className="font-bold text-[18px] text-[#0a0a0a] tracking-tight">Status Kualifikasi</h2>
                   </div>
-                  <div className="bg-white/50 backdrop-blur-sm rounded-xl p-4 border border-white/40 mb-4">
-                    <p className="text-sm text-[#6e3816]">
-                      Selamat! Anda telah lolos ke babak berikutnya.<br />
-                      <strong className="text-[#0a0a0a] font-black text-base">
-                        Persiapkan diri untuk babak selanjutnya!
-                      </strong>
+                  <div className="bg-white/60 backdrop-blur-sm rounded-[20px] p-5 border-2 border-[#0a0a0a]/10 mb-4">
+                    <p className="text-sm text-[#0a0a0a]">
+                      Selamat! Anda dinyatakan <strong className="text-[#0a0a0a] font-black text-base uppercase bg-white px-2 py-0.5 rounded-md border border-[#0a0a0a]/15 shadow-sm ml-1 mr-1">lolos</strong> ke babak berikutnya.<br />
+                      <span className="text-[#0a0a0a]/80 font-medium text-xs mt-2 block leading-relaxed">
+                        Persiapkan diri Anda sebaik mungkin untuk menghadapi tantangan di tahap selanjutnya.
+                      </span>
                     </p>
                   </div>
-                  <p className="text-xs text-[#6e3816]/90 leading-relaxed">
-                    Terus semangat dan pertahankan prestasimu di babak selanjutnya!
+                  <p className="text-xs text-[#0a0a0a] font-bold leading-relaxed flex items-start gap-2">
+                    <span className="material-symbols-outlined text-[18px] shrink-0">rocket_launch</span>
+                    <span>Terus semangat dan pertahankan prestasimu!</span>
+                  </p>
+                </div>
+              </div>
+            ) : hasFailedAnyRound ? (
+              /* Qualification Status Card — shown after failing a round */
+              <div className="bg-[#ff6b5a] rounded-[28px] p-5 sm:p-6 shadow-lg relative overflow-hidden group border-2 border-[#0a0a0a] clay-shadow">
+                <div className="absolute -right-4 -top-4 w-32 h-32 bg-white/20 rounded-full blur-2xl group-hover:scale-110 transition-transform duration-500" />
+                <div className="relative z-10">
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className="w-10 h-10 rounded-[14px] bg-[#0a0a0a] flex items-center justify-center shrink-0 clay-shadow-sm">
+                      <span className="material-symbols-outlined text-[#ff6b5a] text-[20px]">cancel</span>
+                    </div>
+                    <h2 className="font-bold text-[18px] text-[#0a0a0a] tracking-tight">Status Kualifikasi</h2>
+                  </div>
+                  <div className="bg-[#ffe3dd] rounded-[20px] p-5 border-2 border-[#0a0a0a]/10 mb-4">
+                    <p className="text-sm text-[#0a0a0a]">
+                      Mohon maaf, Anda <strong className="text-[#ff6b5a] font-black text-base uppercase">tidak lolos</strong> ke babak selanjutnya.<br />
+                      <span className="text-[#0a0a0a]/70 font-medium text-xs mt-2 block leading-relaxed">
+                        Terima kasih atas partisipasi dan perjuangan luar biasa Anda di OPTIMA 2026.
+                      </span>
+                    </p>
+                  </div>
+                  <p className="text-xs text-[#0a0a0a] font-bold leading-relaxed flex items-start gap-2">
+                    <span className="material-symbols-outlined text-[18px] shrink-0">psychology</span>
+                    <span>Jangan menyerah dan sampai jumpa di kompetisi berikutnya! Tetap semangat belajar.</span>
                   </p>
                 </div>
               </div>

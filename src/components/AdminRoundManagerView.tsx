@@ -51,6 +51,16 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
   const [showImportOptionsModal, setShowImportOptionsModal] = useState<boolean>(false);
   const roundCardsContainerRef = useRef<HTMLDivElement>(null);
 
+  const isModalOpen = !!editingQuestion || showAddModal || !!deleteConfirmId || showImportOptionsModal;
+  useEffect(() => {
+    if (isModalOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [isModalOpen]);
+
   // Drag and drop states for round cards reordering
   const [draggedRoundId, setDraggedRoundId] = useState<string | null>(null);
   const [dragOverRoundId, setDragOverRoundId] = useState<string | null>(null);

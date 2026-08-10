@@ -92,6 +92,16 @@ export const AdminAccountManagerView: React.FC<AdminAccountManagerViewProps> = (
 
   useEffect(() => { loadAccounts(); }, [loadAccounts]);
 
+  const isModalOpen = !!editModal || createModalOpen || !!deleteTarget;
+  useEffect(() => {
+    if (isModalOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [isModalOpen]);
+
   const handleToggleActivation = async (account: ParticipantAccount) => {
     setProcessingId(account.id);
     try {

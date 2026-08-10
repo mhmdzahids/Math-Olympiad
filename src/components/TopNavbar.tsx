@@ -292,7 +292,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
             </>
           ) : (
             <>
-              {currentScreen === 'student-dashboard' && (
+              {isLoggedIn && (
                 <button
                   onClick={() => {
                     setActiveSection(null);

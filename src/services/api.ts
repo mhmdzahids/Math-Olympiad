@@ -573,11 +573,11 @@ class ApiService {
   }
 
   // ── Account Activation ──────────────────────────────────────
-  async getMyActivationStatus(): Promise<{ is_active: boolean; has_passed_any_round: boolean; full_name: string }> {
+  async getMyActivationStatus(): Promise<{ is_active: boolean; has_passed_any_round: boolean; has_failed_any_round: boolean; full_name: string }> {
     const res = await fetch(`${API_BASE_URL}/rounds/my/activation-status`, {
       headers: this.getAuthHeaders(),
     });
-    if (!res.ok) return { is_active: true, has_passed_any_round: false, full_name: '' };
+    if (!res.ok) return { is_active: true, has_passed_any_round: false, has_failed_any_round: false, full_name: '' };
     return res.json();
   }
 

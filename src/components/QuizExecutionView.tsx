@@ -70,6 +70,16 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
     };
   }, []);
 
+  const isModalOpen = showAntiCheatModal || showSubmitConfirmModal;
+  useEffect(() => {
+    if (isModalOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [isModalOpen]);
+
   // UUID validation helper — mock IDs like "round-sd-1" are not valid UUIDs
   const isValidUUID = (id: string) =>
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
