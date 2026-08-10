@@ -26,6 +26,9 @@ class Settings:
         "CORS_ORIGINS", "http://localhost:5173"
     ).split(",")
     
+    RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
+    RESEND_FROM_EMAIL: str = os.getenv("RESEND_FROM_EMAIL", "onboarding@joinoptima.my.id")
+    
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "production")
 
 

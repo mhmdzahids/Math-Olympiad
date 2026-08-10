@@ -133,25 +133,22 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
         await executeLogin(email, password);
       } else {
         // Kolektif / Guru
-        // Loop through all students and register them with generated credentials
-        for (const student of studentsList) {
-          if (!student.name) continue;
-          const regCategory = student.category === 'SD' ? 'sd' : student.category === 'SMP' ? 'smp' : 'sma';
-          
-          // Generate mock email & password for backend compatibility
-          const random4Digit = Math.floor(1000 + Math.random() * 9000);
-          const mockEmail = `${student.name.toLowerCase().replace(/[^a-z0-9]/g, '')}_${random4Digit}@optima.ac.id`;
-          const mockPassword = 'Pass' + Math.random().toString(36).substring(2, 10).padEnd(8, '0');
+        const validStudents = studentsList.filter(s => s.name.trim() !== '').map(s => ({
+          name: s.name,
+          category: s.category === 'SD' ? 'sd' : s.category === 'SMP' ? 'smp' : 'sma' as 'sd' | 'smp' | 'sma',
+          grade: s.grade,
+        }));
 
-          await apiService.register({
-            email: mockEmail,
-            password: mockPassword,
-            full_name: student.name,
-            school_name: school,
-            category: regCategory,
-            grade: student.grade,
-          });
+        if (validStudents.length === 0) {
+          throw new Error('Minimal harus ada 1 siswa yang didaftarkan.');
         }
+
+        await apiService.registerCollective({
+          teacher_email: email,
+          teacher_name: teacherName,
+          school_name: school,
+          students: validStudents,
+        });
         setIsCollectiveSuccess(true);
       }
     } catch (err: any) {

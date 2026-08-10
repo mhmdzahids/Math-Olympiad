@@ -26,6 +26,19 @@ class RegisterRequest(BaseModel):
     phone: Optional[str] = None
 
 
+class StudentCollectiveData(BaseModel):
+    name: str
+    category: Category
+    grade: str
+
+
+class RegisterCollectiveRequest(BaseModel):
+    teacher_email: EmailStr
+    teacher_name: str
+    school_name: str
+    students: list[StudentCollectiveData]
+
+
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str

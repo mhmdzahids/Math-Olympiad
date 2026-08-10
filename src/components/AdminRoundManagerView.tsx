@@ -51,15 +51,7 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
   const [showImportOptionsModal, setShowImportOptionsModal] = useState<boolean>(false);
   const roundCardsContainerRef = useRef<HTMLDivElement>(null);
 
-  const isModalOpen = !!editingQuestion || showAddModal || !!deleteConfirmId || showImportOptionsModal;
-  useEffect(() => {
-    if (isModalOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => { document.body.style.overflow = ""; };
-  }, [isModalOpen]);
+
 
   // Drag and drop states for round cards reordering
   const [draggedRoundId, setDraggedRoundId] = useState<string | null>(null);
@@ -288,8 +280,8 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
       const endDt = new Date(`${eDate}T${eTime}:00`);
       const now = new Date();
 
-      const computedDbStatus: 'aktif' | 'ditutup' | 'belum_dibuka' =
-        r.status === 'locked' ? 'belum_dibuka' : now > endDt ? 'ditutup' : now < startDt ? 'belum_dibuka' : 'aktif';
+      const computedDbStatus: 'aktif' | 'selesai' | 'belum_dibuka' =
+        r.status === 'locked' ? 'belum_dibuka' : now > endDt ? 'selesai' : now < startDt ? 'belum_dibuka' : 'aktif';
 
       try {
         await apiService.updateRound(r.id, {
@@ -353,6 +345,16 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
     { key: 'D', text: '' }
   ]);
   const [newKey, setNewKey] = useState('A');
+
+  const isModalOpen = !!editingQuestion || showAddModal || !!deleteConfirmId || showImportOptionsModal;
+  useEffect(() => {
+    if (isModalOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [isModalOpen]);
 
   const toggleExpand = (id: string) => {
     const nextId = expandedRoundId === id ? '' : id;
