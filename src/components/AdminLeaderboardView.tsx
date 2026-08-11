@@ -186,7 +186,7 @@ const ROUND_ACCENT: Record<number, { active: string; outline: string; icon: stri
 const DEFAULT_ACCENT = { active: 'bg-[#ebe6d6] text-[#0a0a0a]', outline: 'outline-[#ebe6d6]', icon: 'radio_button_checked' };
 
 const getEffectiveRoundStatusKey = (round: RoundData): string => {
-  if (round.status === 'selesai' || (round.status as string) === 'ditutup') {
+  if (round.status === 'ditutup') {
     return 'ditutup';
   }
   if (round.end_date) {

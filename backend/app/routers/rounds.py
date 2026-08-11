@@ -454,7 +454,9 @@ def delete_round(
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin)
 ):
-    """[Admin] Menghapus babak lomba dari database."""
+    """[Admin] Menghapus babak lomba dari database beserta relasinya."""
+    from app.models import Question, QuizSession, Qualification, QuestionImport, Answer, TabSwitchLog
+    
     target_round = db.query(Round).filter(Round.id == round_id).first()
     if not target_round:
         raise HTTPException(
@@ -462,8 +464,32 @@ def delete_round(
             detail="Babak tidak ditemukan.",
         )
 
-    db.delete(target_round)
-    db.commit()
+    try:
+        # Hapus jawaban dan log dari sesi kuis babak ini
+        session_ids = [s.id for s in db.query(QuizSession.id).filter(QuizSession.round_id == round_id).all()]
+        if session_ids:
+            db.query(Answer).filter(Answer.session_id.in_(session_ids)).delete(synchronize_session=False)
+            db.query(TabSwitchLog).filter(TabSwitchLog.session_id.in_(session_ids)).delete(synchronize_session=False)
+            db.query(QuizSession).filter(QuizSession.round_id == round_id).delete(synchronize_session=False)
+            
+        # Hapus soal-soal di babak ini
+        db.query(Question).filter(Question.round_id == round_id).delete(synchronize_session=False)
+        
+        # Hapus riwayat import soal
+        db.query(QuestionImport).filter(QuestionImport.round_id == round_id).delete(synchronize_session=False)
+        
+        # Hapus kualifikasi peserta di babak ini
+        db.query(Qualification).filter(Qualification.round_id == round_id).delete(synchronize_session=False)
+
+        # Akhirnya, hapus babak
+        db.delete(target_round)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Terjadi kesalahan saat menghapus babak: {str(e)}"
+        )
     return None
 
 
@@ -502,8 +528,19 @@ def get_round_questions(
 def sanitize_win1252(text: str | None) -> str | None:
     if not text:
         return text
-    # Map common math unicode characters that fail in Windows CP1252 PostgreSQL databases
-    return text.replace('\u2212', '-').replace('\u2264', '<=').replace('\u2265', '>=').replace('\u2260', '!=')
+    
+    # Map only functionally identical characters to ASCII equivalents 
+    # (e.g. unicode minus to ascii minus) to ensure frontend regexes still work.
+    replacements = {
+        '\u2212': '-', '\u2014': '-', '\u2013': '-'
+    }
+    for k, v in replacements.items():
+        text = text.replace(k, v)
+    
+    # Gracefully convert any remaining unsupported Unicode math characters (like theta, integral, degrees)
+    # into HTML entities (e.g., &#8747; for integral). The frontend browser will render these perfectly
+    # and PostgreSQL will accept them because they are purely ASCII strings.
+    return text.encode('cp1252', errors='xmlcharrefreplace').decode('cp1252')
 
 @router.post("/{round_id}/questions/import", status_code=status.HTTP_201_CREATED)
 def import_questions_to_round(

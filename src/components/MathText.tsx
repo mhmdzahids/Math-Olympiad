@@ -17,6 +17,19 @@ interface MathTextProps {
 export const MathText: React.FC<MathTextProps> = ({ text, className = '', inline = true }) => {
   if (!text) return null;
 
+  // Decode HTML entities safely so they can be processed by our regex and rendered properly by React
+  const decodeHTMLEntities = (rawText: string) => {
+    try {
+      const parser = new DOMParser();
+      const dom = parser.parseFromString(`<!doctype html><body>${rawText}`, 'text/html');
+      return dom.body.textContent || rawText;
+    } catch {
+      return rawText;
+    }
+  };
+
+  const decodedText = decodeHTMLEntities(text);
+
   // Safely render LaTeX using KaTeX
   const renderKaTeX = (mathStr: string, displayMode: boolean): string => {
     try {
@@ -32,9 +45,9 @@ export const MathText: React.FC<MathTextProps> = ({ text, className = '', inline
 
   // Check if text already has explicit delimiters: $, $$, \(, \[, etc.
   const delimiterRegex = /(\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\$[^\$\n]+?\$|\\\([\s\S]+?\\\))/g;
-  const hasExplicitDelimiters = delimiterRegex.test(text);
+  const hasExplicitDelimiters = delimiterRegex.test(decodedText);
 
-  let textToParse = text;
+  let textToParse = decodedText;
 
   if (!hasExplicitDelimiters) {
     // Smart auto-formatter for plain text math notations without explicit $ delimiters:
@@ -94,7 +107,7 @@ export const MathText: React.FC<MathTextProps> = ({ text, className = '', inline
   }
 
   if (chunks.length === 0) {
-    return <span className={className}>{text}</span>;
+    return <span className={className}>{decodedText}</span>;
   }
 
   const ContainerTag = inline ? 'span' : 'div';

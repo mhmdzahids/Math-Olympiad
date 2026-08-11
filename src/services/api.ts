@@ -49,7 +49,7 @@ export interface RoundData {
   name: string;
   category: 'sd' | 'smp' | 'sma';
   mode: 'online' | 'offline';
-  status: 'draft' | 'aktif' | 'selesai' | 'belum_dibuka';
+  status: 'draft' | 'aktif' | 'ditutup' | 'belum_dibuka';
   duration_minutes: number;
   question_count?: number;
   tab_switch_limit: number;

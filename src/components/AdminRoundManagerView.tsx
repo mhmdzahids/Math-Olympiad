@@ -270,8 +270,12 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
     }));
     updateRounds(sanitizedRounds);
 
+    const finalRounds = [...sanitizedRounds];
+    let needsUpdate = false;
+
     // Sync edited rounds to backend
-    for (const r of sanitizedRounds) {
+    for (let i = 0; i < finalRounds.length; i++) {
+      const r = finalRounds[i];
       const sDate = r.startDate || '2026-08-01';
       const sTime = r.startTime || '08:00';
       const eDate = r.endDate || '2026-08-10';
@@ -280,28 +284,13 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
       const endDt = new Date(`${eDate}T${eTime}:00`);
       const now = new Date();
 
-      const computedDbStatus: 'aktif' | 'selesai' | 'belum_dibuka' =
-        r.status === 'locked' ? 'belum_dibuka' : now > endDt ? 'selesai' : now < startDt ? 'belum_dibuka' : 'aktif';
+      const computedDbStatus: 'aktif' | 'ditutup' | 'belum_dibuka' =
+        r.status === 'locked' ? 'belum_dibuka' : now > endDt ? 'ditutup' : now < startDt ? 'belum_dibuka' : 'aktif';
 
       try {
-        await apiService.updateRound(r.id, {
-          name: r.title,
-          category: r.category.toLowerCase() as 'sd' | 'smp' | 'sma',
-          mode: r.executionMode,
-          status: computedDbStatus,
-          duration_minutes: r.durationMinutes,
-          question_count: r.questionCount,
-          tab_switch_limit: r.tabSwitchLimit,
-          is_randomized: r.isRandomized ?? true,
-          is_offline_started: r.isOfflineStarted,
-          start_date: r.startDate,
-          start_time: r.startTime,
-          end_date: r.endDate,
-          end_time: r.endTime,
-        });
-      } catch (err) {
-        try {
-          await apiService.createRound({
+        if (r.id.startsWith('round-')) {
+          // This is a newly created local round that hasn't been synced to the backend yet
+          const created = await apiService.createRound({
             name: r.title,
             category: r.category.toLowerCase() as 'sd' | 'smp' | 'sma',
             mode: r.executionMode,
@@ -313,10 +302,34 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
             end_date: r.endDate,
             end_time: r.endTime,
           });
-        } catch (createErr) {
-          console.warn('Could not sync round to backend:', createErr);
+          finalRounds[i] = { ...finalRounds[i], id: created.id };
+          needsUpdate = true;
+        } else {
+          // Existing round, update it
+          await apiService.updateRound(r.id, {
+            name: r.title,
+            category: r.category.toLowerCase() as 'sd' | 'smp' | 'sma',
+            mode: r.executionMode,
+            status: computedDbStatus,
+            duration_minutes: r.durationMinutes,
+            question_count: r.questionCount,
+            tab_switch_limit: r.tabSwitchLimit,
+            is_randomized: r.isRandomized ?? true,
+            is_offline_started: r.isOfflineStarted,
+            start_date: r.startDate,
+            start_time: r.startTime,
+            end_date: r.endDate,
+            end_time: r.endTime,
+          });
         }
+      } catch (err: any) {
+        console.warn('Could not sync round to backend:', err);
+        alert(`Gagal menyimpan pengaturan babak "${r.title}": ${err.message || 'Kesalahan tak terduga'}`);
       }
+    }
+
+    if (needsUpdate) {
+      updateRounds(finalRounds);
     }
 
     if (showAlert) {
@@ -369,20 +382,22 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
     if (window.confirm(`Apakah Anda yakin ingin menghapus babak "${roundTitle || 'ini'}"?`)) {
       try {
         await apiService.deleteRound(roundId);
-      } catch (err) {
+        
+        const updated = currentRounds.filter((r) => r.id !== roundId);
+        updateRounds(updated);
+        if (expandedRoundId === roundId) {
+          setExpandedRoundId('');
+        }
+        // Otomatis tersimpan ke DB & keluar dari mode edit
+        setIsEditingSettings(false);
+        setIsSaveHighlighted(false);
+        setRoundsBackup(null);
+        if (onEditModeChange) onEditModeChange(false);
+        onShowToast?.(`Babak "${roundTitle || ''}" berhasil dihapus!`, 'info', 'Babak Dihapus');
+      } catch (err: any) {
         console.warn('Failed to delete round from DB:', err);
+        alert(err.message || 'Gagal menghapus babak dari database. Babak mungkin masih memiliki sesi kuis atau data terkait.');
       }
-      const updated = currentRounds.filter((r) => r.id !== roundId);
-      updateRounds(updated);
-      if (expandedRoundId === roundId) {
-        setExpandedRoundId('');
-      }
-      // Otomatis tersimpan ke DB & keluar dari mode edit
-      setIsEditingSettings(false);
-      setIsSaveHighlighted(false);
-      setRoundsBackup(null);
-      if (onEditModeChange) onEditModeChange(false);
-      onShowToast?.(`Babak "${roundTitle || ''}" berhasil dihapus!`, 'info', 'Babak Dihapus');
     }
   };
 
