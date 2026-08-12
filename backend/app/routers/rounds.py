@@ -25,6 +25,37 @@ from app.schemas import (
 import random
 from app.security import require_admin, get_current_user, get_current_user_optional
 
+import html as html_lib
+import re as re_lib
+
+def normalize_isian(s: str) -> str:
+    """Normalize for comparison: handles HTML entities, unicode math, braces, and spaces."""
+    if s is None:
+        return ""
+    # 1. Decode HTML entities: &#8730; → √, &amp; → &, etc.
+    s = html_lib.unescape(str(s))
+    # 2. Normalize Unicode math symbols → LaTeX equivalents
+    unicode_map = {
+        '√': r'\sqrt', '∛': r'\sqrt[3]', '∜': r'\sqrt[4]',
+        'π': r'\pi', '∞': r'\infty', '±': r'\pm',
+        '×': r'\times', '÷': r'\div', '·': r'\cdot',
+        '≤': r'\leq', '≥': r'\geq', '≠': r'\neq',
+        '∈': r'\in', '∉': r'\notin', '∑': r'\sum',
+        '∫': r'\int', '∘': r'\circ', '−': '-',
+        '²': '^2', '³': '^3', '⁴': '^4',
+    }
+    for uni, latex in unicode_map.items():
+        s = s.replace(uni, latex)
+    # 3. Lowercase all LaTeX command names (\SQRT → \sqrt)
+    s = re_lib.sub(r'\\([A-Za-z]+)', lambda m: '\\' + m.group(1).lower(), s)
+    # 4. Remove ALL braces — structural, not semantic for comparison
+    s = s.replace('{', '').replace('}', '')
+    # 5. Remove all spaces
+    s = s.replace(' ', '')
+    # 6. Lowercase everything
+    s = s.lower()
+    return s
+
 def compute_effective_round_status(round_obj: Round) -> RoundStatus:
     """
     Menghitung status efektif sebuah babak secara dinamis berdasarkan 
@@ -279,8 +310,11 @@ def get_participant_detail_admin(
                     submitted_ans = q.correct_answer
 
             is_correct = False
-            if submitted_ans and str(submitted_ans).upper().strip() == str(q.correct_answer).upper().strip():
-                is_correct = True
+            if submitted_ans:
+                if q.question_type == "ISIAN":
+                    is_correct = (normalize_isian(submitted_ans) == normalize_isian(q.correct_answer))
+                else:
+                    is_correct = (str(submitted_ans).upper().strip() == str(q.correct_answer).upper().strip())
 
             submission_breakdown.append({
                 "number": idx + 1,
@@ -853,7 +887,12 @@ def submit_quiz_answers(
                 else:
                     total_points += 3
 
-            clean_ans = str(submitted_ans).upper().strip() if submitted_ans else None
+            # Untuk soal ISIAN: simpan as-is (hanya trim), karena LaTeX case-sensitive
+            # Untuk soal PG: uppercase agar option ID (A/B/C/D/E) konsisten
+            if q.question_type == "ISIAN":
+                clean_ans = str(submitted_ans).strip() if submitted_ans else None
+            else:
+                clean_ans = str(submitted_ans).upper().strip() if submitted_ans else None
             
             # Save answer to DB
             if clean_ans is not None:
@@ -877,13 +916,14 @@ def submit_quiz_answers(
             # Hitung Skor Aktual
             is_correct = False
             if clean_ans:
-                # Untuk soal ISIAN, kita hapus spasi berlebih untuk perbandingan
+                # Untuk soal ISIAN: perbandingan toleran untuk mengatasi perbedaan
+                # format notasi matematika (spasi, braces, HTML entities, case, unicode)
                 if q.question_type == "ISIAN":
-                    clean_ans_normalized = " ".join(clean_ans.split())
-                    correct_ans_normalized = " ".join(str(q.correct_answer).upper().strip().split())
-                    is_correct = (clean_ans_normalized == correct_ans_normalized)
+                    is_correct = (normalize_isian(clean_ans) == normalize_isian(str(q.correct_answer)))
                 else:
                     is_correct = (clean_ans == str(q.correct_answer).upper().strip())
+
+
 
             if category in (Category.sd, Category.smp):
                 if clean_ans:
