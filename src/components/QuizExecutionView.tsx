@@ -36,11 +36,13 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
   const [showSubmitConfirmModal, setShowSubmitConfirmModal] = useState<boolean>(false);
   const [lastActivityLog, setLastActivityLog] = useState<string>('');
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
+  const [isIsianFocused, setIsIsianFocused] = useState<boolean>(false);
 
   // Ref to prevent double-triggering when both 'blur' and 'visibilitychange' fire for 1 tab switch
   const lastViolationTimeRef = useRef<number>(0);
 
   const userAnswersRef = useRef(userAnswers);
+  const isianInputRef = useRef<HTMLInputElement>(null);
   const flaggedRef = useRef(flagged);
 
   useEffect(() => {
@@ -272,9 +274,18 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
   const activeQuestions = questions.length > 0 ? questions : MOCK_QUESTIONS;
   const currentQ = activeQuestions[currentIdx] || activeQuestions[0];
 
+  // Normalize ISIAN answer: lowercase all LaTeX command names to fix
+  // browser autocorrect that converts \sqrt → \SQRT or \Sqrt.
+  // Also trims extra whitespace.
+  const normalizeIsianAnswer = (val: string): string => {
+    return val
+      .replace(/\\([A-Z][a-zA-Z]*)/g, (_, cmd) => `\\${cmd.toLowerCase()}`)
+      .trimStart();
+  };
+
   const handleSelectOption = (optId: string) => {
     if (isSubmitted) return;
-    setUserAnswers((prev) => ({ ...prev, [currentQ.id]: optId }));
+    setUserAnswers((prev) => ({ ...prev, [currentQ.id]: normalizeIsianAnswer(optId) }));
   };
 
   const toggleFlagCurrent = () => {
@@ -283,6 +294,31 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
       ...prev,
       [currentQ.id]: !prev[currentQ.id]
     }));
+  };
+
+  const insertMathNotation = (notation: string, cursorOffset: number) => {
+    if (isSubmitted) return;
+    const currentVal = userAnswers[currentQ.id] || '';
+    const inputEl = isianInputRef.current;
+    
+    let startPos = currentVal.length;
+    let endPos = currentVal.length;
+    
+    if (inputEl) {
+      startPos = inputEl.selectionStart ?? currentVal.length;
+      endPos = inputEl.selectionEnd ?? currentVal.length;
+    }
+
+    const newVal = currentVal.slice(0, startPos) + notation + currentVal.slice(endPos);
+    setUserAnswers((prev) => ({ ...prev, [currentQ.id]: newVal }));
+
+    // Setelah state di-update, kembalikan fokus dan geser kursor
+    if (inputEl) {
+      setTimeout(() => {
+        inputEl.focus();
+        inputEl.setSelectionRange(startPos + cursorOffset, startPos + cursorOffset);
+      }, 10);
+    }
   };
 
   const handleSubmitQuiz = async () => {
@@ -372,20 +408,90 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
 
           {currentQ.type === 'ISIAN' ? (
             <div className="w-full mt-4">
-              <input
-                type="text"
-                disabled={isSubmitted}
-                value={userAnswers[currentQ.id] || ''}
-                onChange={(e) => handleSelectOption(e.target.value)}
-                placeholder="Ketik jawaban Anda di sini..."
-                className="w-full bg-white border-2 border-[#e7e2d8] focus:border-[#a4d4c5] p-5 rounded-2xl text-lg font-bold text-[#0a0a0a] outline-none clay-shadow-sm transition-colors disabled:opacity-50"
-              />
+              {/* Wrapper container — looks like an input field */}
+              <div
+                className={`relative w-full bg-white border-2 rounded-2xl clay-shadow-sm transition-colors min-h-[68px] flex items-center cursor-text ${
+                  isIsianFocused ? 'border-[#a4d4c5]' : 'border-[#e7e2d8]'
+                } ${isSubmitted ? 'opacity-50 cursor-default' : ''}`}
+                onClick={() => {
+                  if (!isSubmitted) isianInputRef.current?.focus();
+                }}
+              >
+                {/* Hidden input — transparent but receives all keyboard events */}
+                <input
+                  ref={isianInputRef}
+                  type="text"
+                  disabled={isSubmitted}
+                  value={userAnswers[currentQ.id] || ''}
+                  onChange={(e) => handleSelectOption(e.target.value)}
+                  onFocus={() => setIsIsianFocused(true)}
+                  onBlur={() => setIsIsianFocused(false)}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-text rounded-2xl"
+                  style={{ caretColor: 'transparent' }}
+                  // Disable browser auto-transformations that corrupt LaTeX commands
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                />
+
+                {/* Always-rendered KaTeX display — user NEVER sees raw LaTeX */}
+                <div className="relative px-4 sm:px-5 py-4 pr-[185px] sm:pr-[225px] text-base sm:text-lg font-bold text-[#0a0a0a] w-full pointer-events-none select-none">
+                  {userAnswers[currentQ.id] ? (
+                    <span className="inline-flex items-center flex-wrap gap-x-1">
+                      <MathText text={`$${userAnswers[currentQ.id]}$`} />
+                      {/* Blinking cursor when focused */}
+                      {isIsianFocused && (
+                        <span className="inline-block w-0.5 h-5 bg-[#0a0a0a] align-middle animate-pulse rounded-full" />
+                      )}
+                    </span>
+                  ) : (
+                    <span className="text-base font-normal text-[#9a9a9a]">
+                      {isIsianFocused ? '' : 'Klik untuk mengetik jawaban...'}
+                    </span>
+                  )}
+                </div>
+
+                {/* Math Notation Toolbar */}
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 sm:gap-1.5 p-1 sm:p-1.5 bg-[#f5f0e0] rounded-xl border border-[#e7e2d8] shadow-sm z-20">
+                  {[
+                    // offset = placed AFTER the full notation (not inside braces)
+                    // because with invisible cursor, users can't tell they're inside {}
+                    // and accidentally type everything inside the braces.
+                    // Users type the argument first (e.g. "21"), then wrap with √.
+                    { label: '√', notation: '\\sqrt{}', offset: 7, title: 'Akar Kuadrat — ketik angka lalu pilih √, atau klik √ lalu ketik di dalam {}' },
+                    { label: 'a/b', notation: '\\frac{}{}', offset: 9, title: 'Pecahan' },
+                    { label: 'xⁿ', notation: '^{}', offset: 3, title: 'Pangkat' },
+                    { label: 'π', notation: '\\pi{}', offset: 5, title: 'Pi' },
+                    { label: '±', notation: '\\pm{}', offset: 5, title: 'Kurang Lebih' },
+                  ].map((btn, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      disabled={isSubmitted}
+                      onMouseDown={(e) => {
+                        // onMouseDown + preventDefault keeps focus on the hidden input
+                        // so cursor position is preserved when notation is inserted
+                        e.preventDefault();
+                        insertMathNotation(btn.notation, btn.offset);
+                      }}
+                      title={btn.title}
+                      className="w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center bg-white hover:bg-[#a4d4c5] active:scale-95 text-[#0a0a0a] font-bold rounded-lg text-xs sm:text-sm border border-[#e7e2d8] shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      {btn.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <p className="text-sm text-[#6a6a6a] mt-2 ml-1">
                 <span className="material-symbols-outlined text-[14px] align-middle mr-1">info</span>
-                Ketik jawaban singkat. Jika jawaban adalah angka satuan, ketikkan langsung (misal: "12"). Jika ada satuan, ikuti format soal.
+                Gunakan tombol notasi di kanan, atau ketik angka langsung. Jawaban dirender otomatis.
               </p>
             </div>
           ) : (
+
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
               {currentQ.options?.map((opt) => {
                 const isSelected = userAnswers[currentQ.id] === opt.id;
