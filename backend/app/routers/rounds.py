@@ -289,8 +289,11 @@ def get_participant_detail_admin(
         total_q = len(questions)
         session_score = float(selected_session.score) if (selected_session and selected_session.score is not None) else 0
 
+        # Cek apakah sesi ini memiliki data riwayat jawaban di tabel Answer
+        has_recorded_answers = db.query(Answer).filter(Answer.session_id == selected_session.id).first() is not None
+
         inferred_correct_count = 0
-        if total_q > 0 and session_score > 0:
+        if not has_recorded_answers and total_q > 0 and session_score > 0:
             points_per_q = 10
             inferred_correct_count = min(total_q, int(session_score / points_per_q))
             if session_score >= (total_q * points_per_q):
@@ -306,7 +309,7 @@ def get_participant_detail_admin(
 
                 if ans_record:
                     submitted_ans = ans_record.selected_answer
-                elif idx < inferred_correct_count:
+                elif not has_recorded_answers and idx < inferred_correct_count:
                     submitted_ans = q.correct_answer
 
             is_correct = False

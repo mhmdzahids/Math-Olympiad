@@ -147,3 +147,9 @@ body {
   background-color: #fef9ef;
   color: #1d1c16;
 }
+
+/* Compact KaTeX block display math spacing */
+.math-rendered-content .katex-display {
+  margin: 0.3em 0 !important;
+  text-align: center;
+}

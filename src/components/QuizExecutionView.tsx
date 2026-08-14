@@ -379,7 +379,7 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
               <span className="bg-[#a4d4c5] text-[#0a0a0a] px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider w-fit">
                 {currentQ.code || `SOAL ${currentQ.id}`}
               </span>
-              <h1 className="text-lg sm:text-xl font-bold text-[#000000] leading-snug">
+              <h1 className="text-lg sm:text-xl font-normal text-[#0a0a0a] leading-relaxed whitespace-pre-line">
                 <MathText text={currentQ.text} />
               </h1>
               {currentQ.note && (
@@ -391,17 +391,12 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
 
             {/* 3D Diagram Container */}
             {currentQ.diagramUrl && (
-              <div className="w-full md:w-64 h-64 bg-[#f8f3e9] rounded-2xl flex items-center justify-center relative border border-[#c4c7c7]/30 shrink-0">
+              <div className="w-full md:w-64 h-64 bg-[#f8f3e9] rounded-2xl flex items-center justify-center relative border border-[#c4c7c7]/30 shrink-0 p-3">
                 <img
                   src={currentQ.diagramUrl}
-                  alt="Diagram Soal 3D"
-                  className="w-48 h-48 object-contain drop-shadow-xl hover:scale-105 transition-transform"
+                  alt="Diagram Soal"
+                  className="w-full h-full object-contain drop-shadow-md hover:scale-105 transition-transform"
                 />
-                <div className="absolute bottom-3 right-3 bg-[#0a0a0a]/10 px-2 py-0.5 rounded-lg backdrop-blur-sm">
-                  <span className="text-[10px] font-bold text-[#0a0a0a]/70">
-                    {currentQ.figLabel || `GAMBAR ${currentQ.id}`}
-                  </span>
-                </div>
               </div>
             )}
           </div>
@@ -460,8 +455,6 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
                     // and accidentally type everything inside the braces.
                     // Users type the argument first (e.g. "21"), then wrap with √.
                     { label: '√', notation: '\\sqrt{}', offset: 7, title: 'Akar Kuadrat — ketik angka lalu pilih √, atau klik √ lalu ketik di dalam {}' },
-                    { label: 'a/b', notation: '\\frac{}{}', offset: 9, title: 'Pecahan' },
-                    { label: 'xⁿ', notation: '^{}', offset: 3, title: 'Pangkat' },
                     { label: 'π', notation: '\\pi{}', offset: 5, title: 'Pi' },
                     { label: '±', notation: '\\pm{}', offset: 5, title: 'Kurang Lebih' },
                   ].map((btn, i) => (
