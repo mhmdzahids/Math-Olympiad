@@ -3,6 +3,7 @@ import { ScreenView, CompetitionRound, ParsedQuestion } from '../types';
 import { INITIAL_ROUNDS, INITIAL_PARSED_QUESTIONS, ASSET_IMAGES } from '../data/mockData';
 import { parseDocxFile, generateSampleTemplateText } from '../utils/docxParser';
 import { apiService } from '../services/api';
+import { MathText } from './MathText';
 
 interface AdminRoundManagerViewProps {
   onNavigate: (screen: ScreenView) => void;
@@ -12,6 +13,7 @@ interface AdminRoundManagerViewProps {
   highlightSaveTrigger?: number;
   selectedRoundTitle?: string;
   onSelectRound?: (roundTitle: string) => void;
+  onShowToast?: (message: string, type?: 'success' | 'info' | 'warning', title?: string) => void;
 }
 
 export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
@@ -21,7 +23,8 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
   onEditModeChange,
   highlightSaveTrigger,
   selectedRoundTitle,
-  onSelectRound
+  onSelectRound,
+  onShowToast,
 }) => {
   const [localRounds, setLocalRounds] = useState<CompetitionRound[]>(propsRounds || INITIAL_ROUNDS);
   const currentRounds = propsRounds || localRounds;
@@ -44,8 +47,79 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
   const [isSaveHighlighted, setIsSaveHighlighted] = useState<boolean>(false);
   const [dbQuestionsCount, setDbQuestionsCount] = useState<number>(0);
   const [isLoadingDbQuestions, setIsLoadingDbQuestions] = useState<boolean>(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [showImportOptionsModal, setShowImportOptionsModal] = useState<boolean>(false);
   const roundCardsContainerRef = useRef<HTMLDivElement>(null);
+
+
+
+  // Drag and drop states for round cards reordering
+  const [draggedRoundId, setDraggedRoundId] = useState<string | null>(null);
+  const [dragOverRoundId, setDragOverRoundId] = useState<string | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, id: string) => {
+    setDraggedRoundId(id);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', id);
+  };
+
+  const handleDragOver = (e: React.DragEvent, id: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverRoundId !== id) {
+      setDragOverRoundId(id);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    const sourceId = draggedRoundId || e.dataTransfer.getData('text/plain');
+    setDraggedRoundId(null);
+    setDragOverRoundId(null);
+
+    if (!sourceId || sourceId === targetId) return;
+
+    const categoryRounds = currentRounds.filter(
+      (r) => (r.category || 'SD').toUpperCase() === selectedCategoryTab
+    );
+
+    const sourceIndex = categoryRounds.findIndex((r) => r.id === sourceId);
+    const targetIndex = categoryRounds.findIndex((r) => r.id === targetId);
+
+    if (sourceIndex === -1 || targetIndex === -1) return;
+
+    const reorderedCategoryRounds = [...categoryRounds];
+    const [movedRound] = reorderedCategoryRounds.splice(sourceIndex, 1);
+    reorderedCategoryRounds.splice(targetIndex, 0, movedRound);
+
+    let catIdx = 0;
+    const newRounds = currentRounds.map((r) => {
+      if ((r.category || 'SD').toUpperCase() === selectedCategoryTab) {
+        const item = reorderedCategoryRounds[catIdx];
+        catIdx++;
+        return item;
+      }
+      return r;
+    });
+
+    ensureEditMode();
+    updateRounds(newRounds);
+
+    reorderedCategoryRounds.forEach(async (r, index) => {
+      try {
+        await apiService.updateRound(r.id, { order_index: index + 1 });
+      } catch (err) {
+        console.warn('Failed to update order_index:', err);
+      }
+    });
+
+    onShowToast?.(`Urutan babak "${movedRound.title}" berhasil diubah!`, 'info', 'Urutan Diperbarui');
+  };
+
+  const handleDragEnd = () => {
+    setDraggedRoundId(null);
+    setDragOverRoundId(null);
+  };
 
   // Load existing questions from DB when expanding a round
   useEffect(() => {
@@ -92,16 +166,21 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
     };
   }, [expandedRoundId]);
 
-  // Synchronize TopNavbar selected round with category tab & expanded round card
+  const prevSelectedRoundTitleRef = useRef<string | undefined>(selectedRoundTitle);
+
+  // Synchronize TopNavbar selected round with category tab & expanded round card (only when selectedRoundTitle changes)
   useEffect(() => {
     if (!selectedRoundTitle) return;
-    const targetRound = currentRounds.find(
-      (r) => r.title === selectedRoundTitle || r.id === selectedRoundTitle
-    );
-    if (targetRound) {
-      const cat = (targetRound.category || 'SD').toUpperCase() as 'SD' | 'SMP' | 'SMA';
-      setSelectedCategoryTab(cat);
-      setExpandedRoundId(targetRound.id);
+    if (prevSelectedRoundTitleRef.current !== selectedRoundTitle) {
+      prevSelectedRoundTitleRef.current = selectedRoundTitle;
+      const targetRound = currentRounds.find(
+        (r) => r.title === selectedRoundTitle || r.id === selectedRoundTitle
+      );
+      if (targetRound) {
+        const cat = (targetRound.category || 'SD').toUpperCase() as 'SD' | 'SMP' | 'SMA';
+        setSelectedCategoryTab(cat);
+        setExpandedRoundId(targetRound.id);
+      }
     }
   }, [selectedRoundTitle, currentRounds]);
 
@@ -191,44 +270,70 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
     }));
     updateRounds(sanitizedRounds);
 
+    const finalRounds = [...sanitizedRounds];
+    let needsUpdate = false;
+
     // Sync edited rounds to backend
-    for (const r of sanitizedRounds) {
+    for (let i = 0; i < finalRounds.length; i++) {
+      const r = finalRounds[i];
+      const sDate = r.startDate || '2026-08-01';
+      const sTime = r.startTime || '08:00';
+      const eDate = r.endDate || '2026-08-10';
+      const eTime = r.endTime || '18:00';
+      const startDt = new Date(`${sDate}T${sTime}:00`);
+      const endDt = new Date(`${eDate}T${eTime}:00`);
+      const now = new Date();
+
+      const computedDbStatus: 'aktif' | 'ditutup' | 'belum_dibuka' =
+        r.status === 'locked' ? 'belum_dibuka' : now > endDt ? 'ditutup' : now < startDt ? 'belum_dibuka' : 'aktif';
+
       try {
-        await apiService.updateRound(r.id, {
-          name: r.title,
-          category: r.category.toLowerCase() as 'sd' | 'smp' | 'sma',
-          mode: r.executionMode,
-          duration_minutes: r.durationMinutes,
-          question_count: r.questionCount,
-          tab_switch_limit: r.tabSwitchLimit,
-          is_offline_started: r.isOfflineStarted,
-          start_date: r.startDate,
-          start_time: r.startTime,
-          end_date: r.endDate,
-          end_time: r.endTime,
-        });
-      } catch (err) {
-        try {
-          await apiService.createRound({
+        if (r.id.startsWith('round-')) {
+          // This is a newly created local round that hasn't been synced to the backend yet
+          const created = await apiService.createRound({
             name: r.title,
             category: r.category.toLowerCase() as 'sd' | 'smp' | 'sma',
             mode: r.executionMode,
             duration_minutes: r.durationMinutes,
             tab_switch_limit: r.tabSwitchLimit,
+            is_randomized: r.isRandomized ?? true,
             start_date: r.startDate,
             start_time: r.startTime,
             end_date: r.endDate,
             end_time: r.endTime,
           });
-        } catch (createErr) {
-          console.warn('Could not sync round to backend:', createErr);
+          finalRounds[i] = { ...finalRounds[i], id: created.id };
+          needsUpdate = true;
+        } else {
+          // Existing round, update it
+          await apiService.updateRound(r.id, {
+            name: r.title,
+            category: r.category.toLowerCase() as 'sd' | 'smp' | 'sma',
+            mode: r.executionMode,
+            status: computedDbStatus,
+            duration_minutes: r.durationMinutes,
+            question_count: r.questionCount,
+            tab_switch_limit: r.tabSwitchLimit,
+            is_randomized: r.isRandomized ?? true,
+            is_offline_started: r.isOfflineStarted,
+            start_date: r.startDate,
+            start_time: r.startTime,
+            end_date: r.endDate,
+            end_time: r.endTime,
+          });
         }
+      } catch (err: any) {
+        console.warn('Could not sync round to backend:', err);
+        alert(`Gagal menyimpan pengaturan babak "${r.title}": ${err.message || 'Kesalahan tak terduga'}`);
       }
     }
 
+    if (needsUpdate) {
+      updateRounds(finalRounds);
+    }
+
     if (showAlert) {
-      alert('Pengaturan babak berhasil diperbarui dan disimpan!');
-      window.location.reload();
+      onShowToast?.('Pengaturan babak berhasil diperbarui dan disimpan!', 'success', 'Pengaturan Disimpan');
     }
   };
 
@@ -243,6 +348,7 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
   // Edit / Add Question Modal states
   const [editingQuestion, setEditingQuestion] = useState<ParsedQuestion | null>(null);
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
+  const [newQuestionType, setNewQuestionType] = useState<'PG' | 'ISIAN'>('PG');
   const [newQuestionText, setNewQuestionText] = useState('');
   const [newImageUrl, setNewImageUrl] = useState<string>('');
   const [newOptions, setNewOptions] = useState<{ key: string; text: string }[]>([
@@ -253,6 +359,16 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
   ]);
   const [newKey, setNewKey] = useState('A');
 
+  const isModalOpen = !!editingQuestion || showAddModal || !!deleteConfirmId || showImportOptionsModal;
+  useEffect(() => {
+    if (isModalOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [isModalOpen]);
+
   const toggleExpand = (id: string) => {
     const nextId = expandedRoundId === id ? '' : id;
     setExpandedRoundId(nextId);
@@ -262,17 +378,25 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
     }
   };
 
-  const handleDeleteRound = async (roundId: string, roundTitle: string) => {
-    if (window.confirm(`Apakah Anda yakin ingin menghapus "${roundTitle}"?`)) {
+  const handleDeleteRound = async (roundId: string, roundTitle?: string) => {
+    if (window.confirm(`Apakah Anda yakin ingin menghapus babak "${roundTitle || 'ini'}"?`)) {
       try {
         await apiService.deleteRound(roundId);
-      } catch (err) {
+        
+        const updated = currentRounds.filter((r) => r.id !== roundId);
+        updateRounds(updated);
+        if (expandedRoundId === roundId) {
+          setExpandedRoundId('');
+        }
+        // Otomatis tersimpan ke DB & keluar dari mode edit
+        setIsEditingSettings(false);
+        setIsSaveHighlighted(false);
+        setRoundsBackup(null);
+        if (onEditModeChange) onEditModeChange(false);
+        onShowToast?.(`Babak "${roundTitle || ''}" berhasil dihapus!`, 'info', 'Babak Dihapus');
+      } catch (err: any) {
         console.warn('Failed to delete round from DB:', err);
-      }
-      const updated = currentRounds.filter((r) => r.id !== roundId);
-      updateRounds(updated);
-      if (expandedRoundId === roundId) {
-        setExpandedRoundId('');
+        alert(err.message || 'Gagal menghapus babak dari database. Babak mungkin masih memiliki sesi kuis atau data terkait.');
       }
     }
   };
@@ -305,6 +429,14 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
     ensureEditMode();
     const updated = currentRounds.map((r) =>
       r.id === roundId ? { ...r, questionCount: count } : r
+    );
+    updateRounds(updated);
+  };
+
+  const handleToggleRandomize = (roundId: string) => {
+    ensureEditMode();
+    const updated = currentRounds.map((r) =>
+      r.id === roundId ? { ...r, isRandomized: !(r.isRandomized ?? true) } : r
     );
     updateRounds(updated);
   };
@@ -475,8 +607,10 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
   };
 
   const resetAddModal = () => {
+    setShowAddModal(false);
     setNewQuestionText('');
     setNewImageUrl('');
+    setNewQuestionType('PG');
     setNewOptions([
       { key: 'A', text: '' },
       { key: 'B', text: '' },
@@ -484,7 +618,6 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
       { key: 'D', text: '' }
     ]);
     setNewKey('A');
-    setShowAddModal(false);
   };
 
   const handleNewImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -519,22 +652,30 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
 
   const handleAddManualQuestion = () => {
     if (!newQuestionText.trim()) return;
-    const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
-    const formattedOpts = newOptions.map((opt, i) => ({
-      key: letters[i] || `P${i + 1}`,
-      text: opt.text.trim() || `Pilihan ${letters[i] || i + 1}`
-    }));
-    const validKeys = formattedOpts.map((o) => o.key);
-    const finalKey = validKeys.includes(newKey) ? newKey : (formattedOpts[0]?.key || 'A');
+    
+    let formattedOpts: { key: string; text: string }[] | undefined = undefined;
+    let finalKey = newKey;
+
+    if (newQuestionType === 'PG') {
+      const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
+      formattedOpts = newOptions.map((opt, i) => ({
+        key: letters[i] || `P${i + 1}`,
+        text: opt.text.trim() || `Pilihan ${letters[i] || i + 1}`
+      }));
+      const validKeys = formattedOpts.map((o) => o.key);
+      finalKey = validKeys.includes(newKey) ? newKey : (formattedOpts[0]?.key || 'A');
+    }
 
     const newQ: ParsedQuestion = {
       id: `Q0${parsedQuestions.length + 1}`,
       questionText: newQuestionText,
+      questionType: newQuestionType,
       options: formattedOpts,
       key: finalKey,
       isError: false,
-      imageUrl: newImageUrl.trim() || undefined
+      imageUrl: newImageUrl || undefined
     };
+
     setParsedQuestions([...parsedQuestions, newQ]);
     resetAddModal();
   };
@@ -744,8 +885,8 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                   setExpandedRoundId('');
                   setParsedQuestions([]);
                 }}
-                className={`px-6 py-2 rounded-full font-extrabold text-xs sm:text-sm transition-all cursor-pointer border-0 ${selectedCategoryTab === 'SD'
-                  ? 'bg-[#ffb084] text-[#0a0a0a] ring-2 ring-[#ffb084] ring-offset-2 ring-offset-[#fef9ef] shadow-2xs'
+                className={`px-6 py-2 rounded-full font-extrabold text-xs sm:text-sm transition-all cursor-pointer ${selectedCategoryTab === 'SD'
+                  ? 'bg-[#ffb084] text-[#0a0a0a] border-2 border-[#0a0a0a] clay-shadow-sm'
                   : 'bg-[#ebe6d6] text-[#555d65] hover:bg-[#e2dccb] hover:text-[#0a0a0a]'
                   }`}
               >
@@ -759,8 +900,8 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                   setExpandedRoundId('');
                   setParsedQuestions([]);
                 }}
-                className={`px-6 py-2 rounded-full font-extrabold text-xs sm:text-sm transition-all cursor-pointer border-0 ${selectedCategoryTab === 'SMP'
-                  ? 'bg-[#b8a4ed] text-[#0a0a0a] ring-2 ring-[#b8a4ed] ring-offset-2 ring-offset-[#fef9ef] shadow-2xs'
+                className={`px-6 py-2 rounded-full font-extrabold text-xs sm:text-sm transition-all cursor-pointer ${selectedCategoryTab === 'SMP'
+                  ? 'bg-[#b8a4ed] text-[#0a0a0a] border-2 border-[#0a0a0a] clay-shadow-sm'
                   : 'bg-[#ebe6d6] text-[#555d65] hover:bg-[#e2dccb] hover:text-[#0a0a0a]'
                   }`}
               >
@@ -774,8 +915,8 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                   setExpandedRoundId('');
                   setParsedQuestions([]);
                 }}
-                className={`px-6 py-2 rounded-full font-extrabold text-xs sm:text-sm transition-all cursor-pointer border-0 ${selectedCategoryTab === 'SMA'
-                  ? 'bg-[#e8b94a] text-[#0a0a0a] ring-2 ring-[#e8b94a] ring-offset-2 ring-offset-[#fef9ef] shadow-2xs'
+                className={`px-6 py-2 rounded-full font-extrabold text-xs sm:text-sm transition-all cursor-pointer ${selectedCategoryTab === 'SMA'
+                  ? 'bg-[#e8b94a] text-[#0a0a0a] border-2 border-[#0a0a0a] clay-shadow-sm'
                   : 'bg-[#ebe6d6] text-[#555d65] hover:bg-[#e2dccb] hover:text-[#0a0a0a]'
                   }`}
               >
@@ -788,7 +929,7 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
             {/* Accordion List */}
             <div ref={roundCardsContainerRef} className="space-y-3">
               {currentRounds
-                .filter((r) => (r.category || 'SD') === selectedCategoryTab)
+                .filter((r) => (r.category || 'SD').toUpperCase() === selectedCategoryTab)
                 .map((round) => {
                   const isExpanded = expandedRoundId === round.id;
                   const isOffline = round.executionMode === 'offline';
@@ -796,17 +937,31 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                   return (
                     <div
                       key={round.id}
-                      className={`rounded-2xl p-4 border transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] relative ${isExpanded
-                        ? 'bg-[#fef9ef] border-[#feaf83]/30 ring-2 ring-[#feaf83]/20 shadow-md'
-                        : 'bg-[#f5f0e0] border-[#0a0a0a]/10 hover:bg-[#ebe6d6]'
-                        }`}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, round.id)}
+                      onDragOver={(e) => handleDragOver(e, round.id)}
+                      onDrop={(e) => handleDrop(e, round.id)}
+                      onDragEnd={handleDragEnd}
+                      className={`rounded-[24px] p-4 sm:p-5 border-2 transition-all duration-300 relative ${
+                        draggedRoundId === round.id ? 'opacity-40 scale-[0.98] border-dashed border-[#0a0a0a]' : ''
+                      } ${
+                        dragOverRoundId === round.id ? 'ring-4 ring-[#feaf83] border-[#0a0a0a]' : ''
+                      } ${
+                        isExpanded
+                          ? 'bg-[#fef9ef] border-[#0a0a0a]/20 clay-shadow ring-2 ring-[#feaf83]/20'
+                          : 'bg-[#f5f0e0] border-[#0a0a0a]/10 hover:bg-[#ebe6d6] clay-shadow-sm'
+                      }`}
                     >
                       <div
                         onClick={() => toggleExpand(round.id)}
                         className="flex items-center justify-between flex-wrap gap-2 cursor-pointer select-none"
                       >
                         <div className="flex items-center gap-3">
-                          <span className="material-symbols-outlined text-[#6a6a6a] cursor-move" onClick={(e) => e.stopPropagation()}>
+                          <span
+                            className="material-symbols-outlined text-[#6a6a6a] hover:text-[#0a0a0a] cursor-grab active:cursor-grabbing p-1 rounded hover:bg-[#0a0a0a]/5 transition-colors shrink-0"
+                            title="Tahan & geser untuk mengubah urutan babak"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             drag_indicator
                           </span>
                           <div>
@@ -823,6 +978,38 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                                   <span>Online</span>
                                 </span>
                               )}
+
+                              {(() => {
+                                const sDate = round.startDate || '2026-08-01';
+                                const sTime = round.startTime || '08:00';
+                                const eDate = round.endDate || '2026-08-10';
+                                const eTime = round.endTime || '18:00';
+                                const startDt = new Date(`${sDate}T${sTime}:00`);
+                                const endDt = new Date(`${eDate}T${eTime}:00`);
+                                const now = new Date();
+
+                                const isClosed = now > endDt;
+                                const isUpcoming = now < startDt;
+
+                                return (
+                                  <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider flex items-center gap-1 border shadow-2xs ${
+                                    round.status === 'locked'
+                                      ? 'bg-gray-100 text-gray-600 border-gray-300'
+                                      : isClosed
+                                      ? 'bg-red-100 text-red-700 border-red-300'
+                                      : isUpcoming
+                                      ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                      : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                  }`}>
+                                    <span className="material-symbols-outlined text-[12px]">
+                                      {round.status === 'locked' ? 'lock' : isClosed ? 'event_busy' : isUpcoming ? 'schedule' : 'check_circle'}
+                                    </span>
+                                    <span>
+                                      {round.status === 'locked' ? 'Terkunci' : isClosed ? 'Ditutup (Waktu Habis)' : isUpcoming ? 'Belum Dimulai' : 'Aktif'}
+                                    </span>
+                                  </span>
+                                );
+                              })()}
                             </div>
                             <p className="text-xs text-[#6a6a6a]">
                               {round.questionCount} Soal • {round.durationMinutes} Menit {isOffline ? '• Proyektor Kelas' : ''}
@@ -864,7 +1051,8 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                                   value={round.title}
                                   onChange={(e) => handleUpdateTitle(round.id, e.target.value)}
                                   placeholder="Masukkan Nama Babak..."
-                                  className="w-full px-3 py-2 text-xs sm:text-sm font-black text-[#0a0a0a] bg-white rounded-xl border border-[#0a0a0a]/30 focus:border-[#0a0a0a] focus:ring-2 focus:ring-[#0a0a0a]/10 shadow-2xs transition-all"
+                                  disabled={!isEditingSettings}
+                                  className={`w-full px-3 py-2 text-xs sm:text-sm font-black text-[#0a0a0a] bg-white rounded-xl border border-[#0a0a0a]/30 focus:border-[#0a0a0a] focus:ring-2 focus:ring-[#0a0a0a]/10 shadow-2xs transition-all ${!isEditingSettings ? 'opacity-60 cursor-not-allowed' : ''}`}
                                 />
                               </div>
 
@@ -873,13 +1061,14 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                                   <span className="material-symbols-outlined text-base text-[#0a0a0a]">format_list_numbered</span>
                                   <span>JUMLAH SOAL</span>
                                 </label>
-                                <div className="flex items-center gap-2 border border-[#0a0a0a]/30 px-3 py-2 rounded-xl bg-white">
+                                <div className={`flex items-center gap-2 border border-[#0a0a0a]/30 px-3 py-2 rounded-xl bg-white ${!isEditingSettings ? 'opacity-60' : ''}`}>
                                   <input
                                     type="number"
                                     onFocus={ensureEditMode}
                                     value={round.questionCount || ''}
                                     onChange={(e) => handleUpdateQuestionCount(round.id, e.target.value === '' ? 0 : (parseInt(e.target.value, 10) || 0))}
-                                    className="font-black text-xs sm:text-sm bg-transparent border-none focus:outline-none w-full text-[#0a0a0a]"
+                                    disabled={!isEditingSettings}
+                                    className={`font-black text-xs sm:text-sm bg-transparent border-none focus:outline-none w-full text-[#0a0a0a] ${!isEditingSettings ? 'cursor-not-allowed' : ''}`}
                                   />
                                   <span className="text-xs text-[#6a6a6a] font-bold shrink-0">Soal</span>
                                 </div>
@@ -894,11 +1083,12 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                                 </label>
                               </div>
 
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                              <div className={`grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 ${!isEditingSettings ? 'opacity-60 pointer-events-none' : ''}`}>
                                 <button
                                   type="button"
                                   onClick={() => handleUpdateExecutionMode(round.id, 'online')}
-                                  className={`py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border-2 transition-all cursor-pointer hover:border-[#0a0a0a] ${!isOffline
+                                  disabled={!isEditingSettings}
+                                  className={`py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border-2 transition-all ${isEditingSettings ? 'cursor-pointer hover:border-[#0a0a0a]' : 'cursor-not-allowed'} ${!isOffline
                                     ? 'bg-[#b8a4ed] border-[#0a0a0a] text-[#0a0a0a] shadow-xs'
                                     : 'bg-white border-[#0a0a0a]/15 text-[#6a6a6a]'
                                     }`}
@@ -910,7 +1100,8 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                                 <button
                                   type="button"
                                   onClick={() => handleUpdateExecutionMode(round.id, 'offline')}
-                                  className={`py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border-2 transition-all cursor-pointer hover:border-[#0a0a0a] ${isOffline
+                                  disabled={!isEditingSettings}
+                                  className={`py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border-2 transition-all ${isEditingSettings ? 'cursor-pointer hover:border-[#0a0a0a]' : 'cursor-not-allowed'} ${isOffline
                                     ? 'bg-[#feaf83] border-[#0a0a0a] text-[#0a0a0a] shadow-xs'
                                     : 'bg-white border-[#0a0a0a]/15 text-[#6a6a6a]'
                                     }`}
@@ -941,25 +1132,27 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                                 <div className="space-y-1">
                                   <span className="text-[10px] font-bold text-[#6a6a6a] uppercase block tracking-wider">Tanggal & Jam Mulai</span>
                                   <div className="flex gap-2">
-                                    <div className="flex-1 flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#0a0a0a]/30 focus-within:border-[#0a0a0a] focus-within:ring-2 focus-within:ring-[#0a0a0a]/10 shadow-2xs bg-white transition-all">
+                                    <div className={`flex-1 flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#0a0a0a]/30 focus-within:border-[#0a0a0a] focus-within:ring-2 focus-within:ring-[#0a0a0a]/10 shadow-2xs bg-white transition-all ${!isEditingSettings ? 'opacity-60' : ''}`}>
                                       <span className="material-symbols-outlined text-[#6a6a6a] text-base shrink-0">calendar_month</span>
                                       <input
                                         type="date"
                                         onFocus={ensureEditMode}
                                         value={round.startDate || '2026-08-01'}
                                         onChange={(e) => handleUpdateSchedule(round.id, 'startDate', e.target.value)}
-                                        className="w-full text-xs font-black text-[#0a0a0a] bg-transparent focus:outline-none cursor-pointer"
+                                        disabled={!isEditingSettings}
+                                        className={`w-full text-xs font-black text-[#0a0a0a] bg-transparent focus:outline-none ${isEditingSettings ? 'cursor-pointer' : 'cursor-not-allowed'}`}
                                       />
                                     </div>
 
-                                    <div className="w-32 flex items-center gap-1.5 px-2.5 py-2 rounded-xl border border-[#0a0a0a]/30 focus-within:border-[#0a0a0a] focus-within:ring-2 focus-within:ring-[#0a0a0a]/10 shadow-2xs bg-white transition-all">
+                                    <div className={`w-32 flex items-center gap-1.5 px-2.5 py-2 rounded-xl border border-[#0a0a0a]/30 focus-within:border-[#0a0a0a] focus-within:ring-2 focus-within:ring-[#0a0a0a]/10 shadow-2xs bg-white transition-all ${!isEditingSettings ? 'opacity-60' : ''}`}>
                                       <span className="material-symbols-outlined text-[#6a6a6a] text-base shrink-0">schedule</span>
                                       <input
                                         type="time"
                                         onFocus={ensureEditMode}
                                         value={round.startTime || '08:00'}
                                         onChange={(e) => handleUpdateSchedule(round.id, 'startTime', e.target.value)}
-                                        className="w-full text-xs font-black text-[#0a0a0a] bg-transparent focus:outline-none cursor-pointer"
+                                        disabled={!isEditingSettings}
+                                        className={`w-full text-xs font-black text-[#0a0a0a] bg-transparent focus:outline-none ${isEditingSettings ? 'cursor-pointer' : 'cursor-not-allowed'}`}
                                       />
                                     </div>
                                   </div>
@@ -969,25 +1162,27 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                                 <div className="space-y-1">
                                   <span className="text-[10px] font-bold text-[#6a6a6a] uppercase block tracking-wider">Tanggal & Jam Selesai</span>
                                   <div className="flex gap-2">
-                                    <div className="flex-1 flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#0a0a0a]/30 focus-within:border-[#0a0a0a] focus-within:ring-2 focus-within:ring-[#0a0a0a]/10 shadow-2xs bg-white transition-all">
+                                    <div className={`flex-1 flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#0a0a0a]/30 focus-within:border-[#0a0a0a] focus-within:ring-2 focus-within:ring-[#0a0a0a]/10 shadow-2xs bg-white transition-all ${!isEditingSettings ? 'opacity-60' : ''}`}>
                                       <span className="material-symbols-outlined text-[#6a6a6a] text-base shrink-0">event_available</span>
                                       <input
                                         type="date"
                                         onFocus={ensureEditMode}
                                         value={round.endDate || '2026-08-10'}
                                         onChange={(e) => handleUpdateSchedule(round.id, 'endDate', e.target.value)}
-                                        className="w-full text-xs font-black text-[#0a0a0a] bg-transparent focus:outline-none cursor-pointer"
+                                        disabled={!isEditingSettings}
+                                        className={`w-full text-xs font-black text-[#0a0a0a] bg-transparent focus:outline-none ${isEditingSettings ? 'cursor-pointer' : 'cursor-not-allowed'}`}
                                       />
                                     </div>
 
-                                    <div className="w-32 flex items-center gap-1.5 px-2.5 py-2 rounded-xl border border-[#0a0a0a]/30 focus-within:border-[#0a0a0a] focus-within:ring-2 focus-within:ring-[#0a0a0a]/10 shadow-2xs bg-white transition-all">
+                                    <div className={`w-32 flex items-center gap-1.5 px-2.5 py-2 rounded-xl border border-[#0a0a0a]/30 focus-within:border-[#0a0a0a] focus-within:ring-2 focus-within:ring-[#0a0a0a]/10 shadow-2xs bg-white transition-all ${!isEditingSettings ? 'opacity-60' : ''}`}>
                                       <span className="material-symbols-outlined text-[#6a6a6a] text-base shrink-0">history_toggle_off</span>
                                       <input
                                         type="time"
                                         onFocus={ensureEditMode}
                                         value={round.endTime || '18:00'}
                                         onChange={(e) => handleUpdateSchedule(round.id, 'endTime', e.target.value)}
-                                        className="w-full text-xs font-black text-[#0a0a0a] bg-transparent focus:outline-none cursor-pointer"
+                                        disabled={!isEditingSettings}
+                                        className={`w-full text-xs font-black text-[#0a0a0a] bg-transparent focus:outline-none ${isEditingSettings ? 'cursor-pointer' : 'cursor-not-allowed'}`}
                                       />
                                     </div>
                                   </div>
@@ -1146,7 +1341,7 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                                 <label className="text-[10px] font-bold text-[#6a6a6a] uppercase tracking-wider">
                                   DURASI WAKTU
                                 </label>
-                                <div className="flex items-center gap-2 border border-[#0a0a0a]/20 px-3 py-2 rounded-xl bg-[#fffaf0]">
+                                <div className={`flex items-center gap-2 border border-[#0a0a0a]/20 px-3 py-2 rounded-xl bg-[#fffaf0] ${!isEditingSettings ? 'opacity-60' : ''}`}>
                                   <span className="material-symbols-outlined text-[#6a6a6a] text-[20px]">
                                     timer
                                   </span>
@@ -1157,7 +1352,8 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                                     onChange={(e) =>
                                       handleUpdateDuration(round.id, e.target.value === '' ? 0 : (parseInt(e.target.value, 10) || 0))
                                     }
-                                    className="font-bold text-sm bg-transparent border-none focus:outline-none w-16 text-[#0a0a0a]"
+                                    disabled={!isEditingSettings}
+                                    className={`font-bold text-sm bg-transparent border-none focus:outline-none w-16 text-[#0a0a0a] ${!isEditingSettings ? 'cursor-not-allowed' : ''}`}
                                   />
                                   <span className="text-xs text-[#6a6a6a] font-semibold">Menit</span>
                                 </div>
@@ -1169,7 +1365,7 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                                   <label className="text-[10px] font-bold text-[#6a6a6a] uppercase tracking-wider">
                                     BATAS PINDAH TAB
                                   </label>
-                                  <div className="flex items-center gap-2 border border-[#0a0a0a]/20 px-3 py-2 rounded-xl bg-[#fffaf0]">
+                                  <div className={`flex items-center gap-2 border border-[#0a0a0a]/20 px-3 py-2 rounded-xl bg-[#fffaf0] ${!isEditingSettings ? 'opacity-60' : ''}`}>
                                     <span className="material-symbols-outlined text-[#6a6a6a] text-[20px]">
                                       security
                                     </span>
@@ -1180,34 +1376,60 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                                       onChange={(e) =>
                                         handleUpdateTabLimit(round.id, e.target.value === '' ? 0 : (parseInt(e.target.value, 10) || 0))
                                       }
-                                      className="font-bold text-sm bg-transparent border-none focus:outline-none w-12 text-[#0a0a0a]"
+                                      disabled={!isEditingSettings}
+                                      className={`font-bold text-sm bg-transparent border-none focus:outline-none w-12 text-[#0a0a0a] ${!isEditingSettings ? 'cursor-not-allowed' : ''}`}
                                     />
                                     <span className="text-xs text-[#6a6a6a] font-semibold">Kali</span>
                                   </div>
                                 </div>
                               )}
+
+
+                              {/* Randomize Toggle (Hanya Muncul jika Kuis Online) */}
+                              {!isOffline && (
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-bold text-[#6a6a6a] uppercase tracking-wider">
+                                    ACAK SOAL
+                                  </label>
+                                  <div className={`flex items-center gap-2 border border-[#0a0a0a]/20 px-3 py-2 rounded-xl bg-[#fffaf0] ${!isEditingSettings ? 'opacity-60' : ''}`}>
+                                    <span className="material-symbols-outlined text-[#6a6a6a] text-[20px]">
+                                      shuffle
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        ensureEditMode();
+                                        handleToggleRandomize(round.id);
+                                      }}
+                                      disabled={!isEditingSettings}
+                                      className={`w-10 h-5 rounded-full relative flex items-center px-0.5 transition-colors ${
+                                        (round.isRandomized ?? true) ? 'bg-[#0a0a0a]' : 'bg-[#c4c7c7]'
+                                      } ${!isEditingSettings ? 'cursor-not-allowed' : ''}`}
+                                    >
+                                      <div
+                                        className={`w-4 h-4 bg-white rounded-full transition-transform ${
+                                          (round.isRandomized ?? true) ? 'translate-x-5' : 'translate-x-0'
+                                        }`}
+                                      />
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
                             </div>
 
-                            {/* Bottom Action Bar: Delete & Save Round Buttons */}
-                            <div className="flex items-center justify-between pt-3 mt-2 border-t border-[#ebe6d6]">
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteRound(round.id, round.title)}
-                                className="px-4 py-2 bg-[#ff6b5a]/10 hover:bg-[#ff6b5a]/20 text-[#d32f2f] font-extrabold text-xs rounded-xl flex items-center gap-1.5 transition-all cursor-pointer border border-[#ff6b5a]/30 shadow-2xs"
-                              >
-                                <span className="material-symbols-outlined text-base">delete</span>
-                                <span>Hapus Babak Ini</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => handleSaveEditing(true)}
-                                className="px-5 py-2.5 bg-[#0a0a0a] hover:bg-[#1a1a1a] text-white font-extrabold text-xs sm:text-sm rounded-xl flex items-center gap-2 transition-all cursor-pointer shadow-md active:scale-95 border border-transparent"
-                              >
-                                <span className="material-symbols-outlined text-base">save</span>
-                                <span>Simpan Perubahan Babak</span>
-                              </button>
-                            </div>
+                            {/* Bottom Action Bar: Delete Round Button (only in edit mode) */}
+                            {isEditingSettings && (
+                              <div className="flex items-center pt-3 mt-2 border-t border-[#ebe6d6]">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteRound(round.id, round.title)}
+                                  className="px-4 py-2 bg-[#ff6b5a]/10 hover:bg-[#ff6b5a]/20 text-[#d32f2f] font-extrabold text-xs rounded-xl flex items-center gap-1.5 transition-all cursor-pointer border border-[#ff6b5a]/30 shadow-2xs"
+                                >
+                                  <span className="material-symbols-outlined text-base">delete</span>
+                                  <span>Hapus Babak Ini</span>
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1234,7 +1456,7 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
 
         {/* Section 2 & 3: Importer & Live Preview (Rendered when a round card is selected) */}
         {!activeExpandedRound ? (
-          <div className="bg-[#fffaf0] rounded-3xl border-2 border-dashed border-[#0a0a0a]/20 p-8 sm:p-12 text-center space-y-3 my-6 animate-in fade-in duration-200">
+          <div className="bg-[#fffaf0] rounded-[28px] border-2 border-dashed border-[#0a0a0a]/20 clay-shadow p-8 sm:p-12 text-center space-y-3 my-6 animate-in fade-in duration-200">
             <div className="w-16 h-16 bg-[#e8b94a]/20 rounded-2xl flex items-center justify-center mx-auto text-[#0a0a0a]">
               <span className="material-symbols-outlined text-4xl text-[#e8b94a]">touch_app</span>
             </div>
@@ -1249,7 +1471,7 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
           <>
             {/* Section 2: Question Importer Panel */}
             <section className="space-y-4">
-              <div className="bg-[#f5f0e0] rounded-2xl overflow-hidden border border-[#0a0a0a]/10 shadow-xs">
+              <div className="bg-[#f5f0e0] rounded-[28px] overflow-hidden border-2 border-[#0a0a0a]/10 clay-shadow">
                 <div className={`p-4 sm:p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 transition-colors ${isSelectedRoundOffline ? 'bg-[#feaf83]' : 'bg-[#b8a4ed]'
                   }`}>
                   <div className="flex items-center gap-3">
@@ -1272,28 +1494,10 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                     </div>
                   </div>
 
-                  {!isSelectedRoundOffline && (
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="text-xs sm:text-sm text-[#0a0a0a] font-bold">
-                        Acak Urutan Soal per Peserta
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setRandomizeOrder(!randomizeOrder)}
-                        className={`w-12 h-6 rounded-full relative flex items-center px-1 transition-colors ${randomizeOrder ? 'bg-[#0a0a0a]' : 'bg-[#c4c7c7]'
-                          }`}
-                      >
-                        <div
-                          className={`w-4 h-4 bg-white rounded-full transition-transform ${randomizeOrder ? 'translate-x-6' : 'translate-x-0'
-                            }`}
-                        />
-                      </button>
-                    </div>
-                  )}
                 </div>
 
                 <div className="p-6 sm:p-10 space-y-4">
-                  <label className="border-2 border-dashed border-[#c4c7c7] hover:border-[#0a0a0a] rounded-2xl p-8 sm:p-12 flex flex-col items-center justify-center bg-[#fffaf0]/50 group transition-colors cursor-pointer text-center block">
+                  <label className="border-2 border-dashed border-[#0a0a0a]/20 hover:border-[#0a0a0a] rounded-[24px] p-8 sm:p-12 flex flex-col items-center justify-center bg-[#fffaf0]/60 group transition-colors cursor-pointer text-center block clay-shadow-sm">
                     <input
                       type="file"
                       accept={isSelectedRoundOffline ? '.pdf,.ppt,.pptx' : '.docx,.doc,.txt'}
@@ -1310,7 +1514,7 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                         <img
                           src={ASSET_IMAGES.documentIcon}
                           alt="Ikon Dokumen"
-                          className="w-20 h-20 group-hover:scale-110 transition-transform object-contain"
+                          className="w-20 h-20 group-hover:scale-110 transition-transform object-contain drop-shadow-md"
                         />
                       )}
                     </div>
@@ -1325,7 +1529,7 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                         : 'Format yang didukung: .docx, .doc, .txt (Maks 20MB)'}
                     </p>
                     <div className="mt-4 flex flex-wrap justify-center gap-2">
-                      <span className="bg-[#0a0a0a] text-white font-bold text-xs px-6 py-2.5 rounded-xl transition-all shadow-xs inline-flex items-center gap-1.5">
+                      <span className="bg-[#0a0a0a] hover:bg-[#1a1a1a] text-white font-bold text-xs px-6 py-2.5 rounded-xl clay-shadow-sm clay-button-active transition-all inline-flex items-center gap-1.5 cursor-pointer border border-[#0a0a0a]">
                         <span className="material-symbols-outlined text-sm">upload_file</span>
                         <span>{isSelectedRoundOffline ? 'Pilih Berkas PDF / PPT' : 'Pilih Berkas Word (.docx)'}</span>
                       </span>
@@ -1337,7 +1541,7 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                             e.stopPropagation();
                             handleDownloadTemplate();
                           }}
-                          className="bg-[#ebe6d6] hover:bg-[#e7e2d8] text-[#0a0a0a] font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-xs inline-flex items-center gap-1.5 cursor-pointer"
+                          className="bg-[#ebe6d6] hover:bg-[#e7e2d8] text-[#0a0a0a] font-bold text-xs px-4 py-2.5 rounded-xl clay-shadow-sm clay-button-active transition-all inline-flex items-center gap-1.5 cursor-pointer border border-[#0a0a0a]/10"
                         >
                           <span className="material-symbols-outlined text-sm text-[#e8b94a]">download</span>
                           <span>Unduh Template Format Soal</span>
@@ -1375,7 +1579,7 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                 </span>
               </div>
 
-              <div className="bg-[#f5f0e0] rounded-2xl overflow-hidden border border-[#0a0a0a]/10 shadow-xs">
+              <div className="bg-white rounded-[28px] overflow-hidden border-2 border-[#0a0a0a]/10 clay-shadow">
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse text-left text-sm">
                     <thead>
@@ -1405,7 +1609,7 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                               </p>
                             ) : (
                               <div className="space-y-1.5">
-                                <p className="text-[#1d1c16] line-clamp-2">{pq.questionText}</p>
+                                <p className="text-[#1d1c16] line-clamp-2"><MathText text={pq.questionText} /></p>
                                 {pq.imageUrl && (
                                   <div className="flex items-center gap-2">
                                     <img
@@ -1429,14 +1633,20 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                               </span>
                             ) : (
                               <div className="flex gap-1.5 flex-wrap">
-                                {pq.options.map((opt) => (
-                                  <span
-                                    key={opt.key}
-                                    className="text-xs bg-[#fffaf0] px-2 py-1 rounded-lg border border-[#0a0a0a]/10 font-medium"
-                                  >
-                                    {opt.key}: {opt.text}
+                                {pq.questionType === 'ISIAN' ? (
+                                  <span className="text-xs bg-[#e05638]/10 text-[#e05638] px-2 py-1 rounded-lg border border-[#e05638]/30 font-bold">
+                                    [Soal Isian Singkat]
                                   </span>
-                                ))}
+                                ) : (
+                                  pq.options?.map((opt) => (
+                                    <span
+                                      key={opt.key}
+                                      className="text-xs bg-[#fffaf0] px-2 py-1 rounded-lg border border-[#0a0a0a]/10 font-medium"
+                                    >
+                                      {opt.key}: <MathText text={opt.text} />
+                                    </span>
+                                  ))
+                                )}
                               </div>
                             )}
                           </td>
@@ -1468,14 +1678,26 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                                 </button>
                               </div>
                             ) : (
-                              <button
-                                onClick={() => handleStartEdit(pq)}
-                                className="text-[#6a6a6a] hover:text-[#0a0a0a] transition-colors p-1 cursor-pointer"
-                              >
-                                <span className="material-symbols-outlined text-[20px]">
-                                  edit
-                                </span>
-                              </button>
+                              <div className="flex gap-1 justify-end">
+                                <button
+                                  onClick={() => handleStartEdit(pq)}
+                                  className="text-[#6a6a6a] hover:text-[#0a0a0a] transition-colors p-1 cursor-pointer flex items-center justify-center"
+                                  title="Ubah Soal"
+                                >
+                                  <span className="material-symbols-outlined text-[20px]">
+                                    edit
+                                  </span>
+                                </button>
+                                <button
+                                  onClick={() => handleSkipQuestion(pq.id)}
+                                  className="text-[#6a6a6a] hover:text-[#ba1a1a] transition-colors p-1 cursor-pointer flex items-center justify-center"
+                                  title="Hapus Soal"
+                                >
+                                  <span className="material-symbols-outlined text-[20px]">
+                                    delete
+                                  </span>
+                                </button>
+                              </div>
                             )}
                           </td>
                         </tr>
@@ -1585,66 +1807,102 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
               )}
             </div>
 
-            {/* Options List */}
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <label className="block text-xs font-bold uppercase text-[#6a6a6a]">Pilihan Jawaban</label>
-                <button
-                  type="button"
-                  onClick={handleAddNewOption}
-                  className="bg-[#f8f3e9] hover:bg-[#ebe6d6] text-[#0a0a0a] px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors border border-[#0a0a0a]/10 cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-sm">add</span>
-                  <span>Tambah Pilihan</span>
-                </button>
-              </div>
-
-              <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
-                {newOptions.map((opt, idx) => {
-                  const isKey = newKey === opt.key;
-                  return (
-                    <div key={idx} className="flex items-center gap-2">
-                      <span className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 border ${isKey ? 'bg-[#a4d4c5] border-[#0a0a0a] text-[#0a0a0a]' : 'bg-[#ebe6d6] border-transparent text-[#0a0a0a]'
-                        }`}>
-                        {opt.key}
-                      </span>
-                      <input
-                        type="text"
-                        value={opt.text}
-                        onChange={(e) => handleOptionTextChange(idx, e.target.value)}
-                        placeholder={`Isi pilihan ${opt.key}...`}
-                        className="flex-grow bg-[#f8f3e9] border border-[#0a0a0a]/10 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-[#0a0a0a]"
-                      />
-                      {newOptions.length > 2 && (
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteNewOption(idx)}
-                          className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg shrink-0 cursor-pointer transition-colors"
-                          title="Hapus Pilihan"
-                        >
-                          <span className="material-symbols-outlined text-base">delete</span>
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+            {/* Question Type Toggle */}
+            <div className="flex gap-2 p-1 bg-[#f8f3e9] rounded-xl border border-[#0a0a0a]/10">
+              <button
+                type="button"
+                onClick={() => setNewQuestionType('PG')}
+                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+                  newQuestionType === 'PG' ? 'bg-white shadow-sm text-[#0a0a0a]' : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
+                }`}
+              >
+                Pilihan Ganda
+              </button>
+              <button
+                type="button"
+                onClick={() => setNewQuestionType('ISIAN')}
+                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+                  newQuestionType === 'ISIAN' ? 'bg-white shadow-sm text-[#0a0a0a]' : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
+                }`}
+              >
+                Isian Singkat
+              </button>
             </div>
+
+            {/* Options List */}
+            {newQuestionType === 'PG' && (
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-xs font-bold uppercase text-[#6a6a6a]">Pilihan Jawaban</label>
+                  <button
+                    type="button"
+                    onClick={handleAddNewOption}
+                    className="bg-[#f8f3e9] hover:bg-[#ebe6d6] text-[#0a0a0a] px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors border border-[#0a0a0a]/10 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-sm">add</span>
+                    <span>Tambah Pilihan</span>
+                  </button>
+                </div>
+
+                <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                  {newOptions.map((opt, idx) => {
+                    const isKey = newKey === opt.key;
+                    return (
+                      <div key={idx} className="flex items-center gap-2">
+                        <span className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 border ${isKey ? 'bg-[#a4d4c5] border-[#0a0a0a] text-[#0a0a0a]' : 'bg-[#ebe6d6] border-transparent text-[#0a0a0a]'
+                          }`}>
+                          {opt.key}
+                        </span>
+                        <input
+                          type="text"
+                          value={opt.text}
+                          onChange={(e) => handleOptionTextChange(idx, e.target.value)}
+                          placeholder={`Isi pilihan ${opt.key}...`}
+                          className="flex-grow bg-[#f8f3e9] border border-[#0a0a0a]/10 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-[#0a0a0a]"
+                        />
+                        {newOptions.length > 2 && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteNewOption(idx)}
+                            className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg shrink-0 cursor-pointer transition-colors"
+                            title="Hapus Pilihan"
+                          >
+                            <span className="material-symbols-outlined text-base">delete</span>
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Answer Key Selection */}
             <div>
-              <label className="block text-xs font-bold uppercase text-[#6a6a6a] mb-1">Kunci Jawaban Benar</label>
-              <select
-                value={newKey}
-                onChange={(e) => setNewKey(e.target.value)}
-                className="w-full bg-[#f8f3e9] border border-[#0a0a0a]/10 rounded-xl p-2.5 text-xs font-bold text-[#0a0a0a] focus:outline-none focus:border-[#0a0a0a]"
-              >
-                {newOptions.map((opt) => (
-                  <option key={opt.key} value={opt.key}>
-                    Pilihan {opt.key} {opt.text ? `— ${opt.text}` : ''}
-                  </option>
-                ))}
-              </select>
+              <label className="block text-xs font-bold uppercase text-[#6a6a6a] mb-1">
+                {newQuestionType === 'PG' ? 'Kunci Jawaban Benar' : 'Jawaban Benar (Isian)'}
+              </label>
+              {newQuestionType === 'PG' ? (
+                <select
+                  value={newKey}
+                  onChange={(e) => setNewKey(e.target.value)}
+                  className="w-full bg-[#f8f3e9] border border-[#0a0a0a]/10 rounded-xl p-2.5 text-xs font-bold text-[#0a0a0a] focus:outline-none focus:border-[#0a0a0a]"
+                >
+                  {newOptions.map((opt) => (
+                    <option key={opt.key} value={opt.key}>
+                      Pilihan {opt.key} {opt.text ? `— ${opt.text}` : ''}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={newKey}
+                  onChange={(e) => setNewKey(e.target.value)}
+                  placeholder="Ketik jawaban isian yang benar..."
+                  className="w-full bg-[#f8f3e9] border border-[#0a0a0a]/10 rounded-xl px-3 py-2 text-sm font-bold focus:outline-none focus:border-[#0a0a0a]"
+                />
+              )}
             </div>
 
             {/* Action Buttons */}
@@ -1735,8 +1993,31 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
               )}
             </div>
 
+            {/* Question Type Toggle */}
+            <div className="flex gap-2 p-1 bg-[#f8f3e9] rounded-xl border border-[#0a0a0a]/10">
+              <button
+                type="button"
+                onClick={() => setEditingQuestion({ ...editingQuestion, questionType: 'PG', options: editingQuestion.options || [{ key: 'A', text: '' }, { key: 'B', text: '' }], isError: false })}
+                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+                  (editingQuestion.questionType || 'PG') === 'PG' ? 'bg-white shadow-sm text-[#0a0a0a]' : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
+                }`}
+              >
+                Pilihan Ganda
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditingQuestion({ ...editingQuestion, questionType: 'ISIAN', options: undefined, isError: false })}
+                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+                  editingQuestion.questionType === 'ISIAN' ? 'bg-white shadow-sm text-[#0a0a0a]' : 'text-[#6a6a6a] hover:text-[#0a0a0a]'
+                }`}
+              >
+                Isian Singkat
+              </button>
+            </div>
+
             {/* Options List Editor */}
-            <div>
+            {(editingQuestion.questionType || 'PG') === 'PG' && (
+              <div>
               <div className="flex justify-between items-center mb-2">
                 <label className="block text-xs font-bold uppercase text-[#6a6a6a]">Pilihan Jawaban</label>
                 <button
@@ -1821,21 +2102,34 @@ export const AdminRoundManagerView: React.FC<AdminRoundManagerViewProps> = ({
                 })}
               </div>
             </div>
+            )}
 
             {/* Answer Key Selection */}
             <div>
-              <label className="block text-xs font-bold uppercase text-[#6a6a6a] mb-1">Kunci Jawaban Benar</label>
-              <select
-                value={editingQuestion.key}
-                onChange={(e) => setEditingQuestion({ ...editingQuestion, key: e.target.value })}
-                className="w-full bg-[#f8f3e9] border border-[#0a0a0a]/10 rounded-xl p-2.5 text-xs font-bold text-[#0a0a0a] focus:outline-none focus:border-[#0a0a0a]"
-              >
-                {(editingQuestion.options || []).map((opt) => (
-                  <option key={opt.key} value={opt.key}>
-                    Pilihan {opt.key} {opt.text ? `— ${opt.text}` : ''}
-                  </option>
-                ))}
-              </select>
+              <label className="block text-xs font-bold uppercase text-[#6a6a6a] mb-1">
+                {(editingQuestion.questionType || 'PG') === 'PG' ? 'Kunci Jawaban Benar' : 'Jawaban Benar (Isian)'}
+              </label>
+              {(editingQuestion.questionType || 'PG') === 'PG' ? (
+                <select
+                  value={editingQuestion.key}
+                  onChange={(e) => setEditingQuestion({ ...editingQuestion, key: e.target.value })}
+                  className="w-full bg-[#f8f3e9] border border-[#0a0a0a]/10 rounded-xl p-2.5 text-xs font-bold text-[#0a0a0a] focus:outline-none focus:border-[#0a0a0a]"
+                >
+                  {(editingQuestion.options || []).map((opt) => (
+                    <option key={opt.key} value={opt.key}>
+                      Pilihan {opt.key} {opt.text ? `— ${opt.text}` : ''}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={editingQuestion.key}
+                  onChange={(e) => setEditingQuestion({ ...editingQuestion, key: e.target.value })}
+                  placeholder="Ketik jawaban isian yang benar..."
+                  className="w-full bg-[#f8f3e9] border border-[#0a0a0a]/10 rounded-xl px-3 py-2 text-sm font-bold focus:outline-none focus:border-[#0a0a0a]"
+                />
+              )}
             </div>
 
             {/* Action Buttons */}

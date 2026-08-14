@@ -8,8 +8,11 @@ import { StudentDashboard } from './components/StudentDashboard';
 import { QuizExecutionView } from './components/QuizExecutionView';
 import { AdminRoundManagerView } from './components/AdminRoundManagerView';
 import { AdminLeaderboardView } from './components/AdminLeaderboardView';
+import { AdminParticipantDetailView } from './components/AdminParticipantDetailView';
+import { AdminAccountManagerView } from './components/AdminAccountManagerView';
 import { Footer } from './components/Footer';
 import { apiService, UserOut } from './services/api';
+import { ToastContainer, ToastMessage } from './components/Toast';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<ScreenView>('landing');
@@ -21,13 +24,76 @@ export default function App() {
   const [rounds, setRounds] = useState<CompetitionRound[]>(INITIAL_ROUNDS);
   const [activeQuizRound, setActiveQuizRound] = useState<CompetitionRound | null>(null);
   const [isAdminEditingRounds, setIsAdminEditingRounds] = useState<boolean>(false);
+  const [selectedParticipantId, setSelectedParticipantId] = useState<string | null>(null);
   const [highlightSaveTrigger, setHighlightSaveTrigger] = useState<number>(0);
   const [authModal, setAuthModal] = useState<'login' | 'register' | null>(null);
   const [authEmail, setAuthEmail] = useState('');
   const [authPass, setAuthPass] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
 
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [showSwitcherBar, setShowSwitcherBar] = useState<boolean>(false);
+
+  // Global Hotkey Listener: Ctrl + ` (backtick) to toggle MathQuest Screen Switcher bar
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && (e.key === '`' || e.code === 'Backquote')) {
+        e.preventDefault();
+        setShowSwitcherBar((prev) => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
+  const showToast = (message: string, type: 'success' | 'info' | 'warning' = 'success', title?: string) => {
+    const id = `toast-${Date.now()}-${Math.random()}`;
+    setToasts((prev) => [...prev, { id, message, type, title }]);
+  };
+
+  const dismissToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
   const [pendingNav, setPendingNav] = useState<{ screen: ScreenView; tab?: 'register' | 'login' } | null>(null);
+
+  const loadRoundsFromDb = async () => {
+    try {
+      const dbRounds = await apiService.getRounds();
+      if (dbRounds && dbRounds.length > 0) {
+        const mapped: CompetitionRound[] = dbRounds.map((r) => ({
+          id: r.id,
+          title: r.name,
+          category: r.category.toUpperCase() as 'SD' | 'SMP' | 'SMA',
+          questionCount: r.question_count ?? (r.category === 'sma' ? 30 : 25),
+          durationMinutes: r.duration_minutes,
+          tabSwitchLimit: r.tab_switch_limit,
+          isRandomized: r.is_randomized ?? true,
+          status: (() => {
+            if (r.status === 'aktif') return 'active';
+            if (r.status === 'belum_dibuka' || r.status === 'draft') return 'upcoming';
+            return 'completed';
+          })(),
+          executionMode: r.mode,
+          isOfflineStarted: r.is_offline_started,
+          startDate: r.start_date,
+          startTime: r.start_time,
+          endDate: r.end_date,
+          endTime: r.end_time,
+        }));
+        setRounds(mapped);
+        const topSd = mapped.find((r) => r.category === 'SD') || mapped[0];
+        if (topSd) {
+          setSelectedRound(topSd.title);
+        }
+      }
+    } catch (err) {
+      console.warn('Fallback to local rounds:', err);
+    }
+  };
 
   useEffect(() => {
     async function checkSession() {
@@ -50,36 +116,6 @@ export default function App() {
       }
     }
 
-    async function loadRoundsFromDb() {
-      try {
-        const dbRounds = await apiService.getRounds();
-        if (dbRounds && dbRounds.length > 0) {
-          const mapped: CompetitionRound[] = dbRounds.map((r) => ({
-            id: r.id,
-            title: r.name,
-            category: r.category.toUpperCase() as 'SD' | 'SMP' | 'SMA',
-            questionCount: r.question_count ?? (r.category === 'sma' ? 30 : 25),
-            durationMinutes: r.duration_minutes,
-            tabSwitchLimit: r.tab_switch_limit,
-            status: r.status === 'draft' ? 'upcoming' : r.status === 'aktif' ? 'active' : 'completed',
-            executionMode: r.mode,
-            isOfflineStarted: r.is_offline_started,
-            startDate: r.start_date,
-            startTime: r.start_time,
-            endDate: r.end_date,
-            endTime: r.end_time,
-          }));
-          setRounds(mapped);
-          const topSd = mapped.find((r) => r.category === 'SD') || mapped[0];
-          if (topSd) {
-            setSelectedRound(topSd.title);
-          }
-        }
-      } catch (err) {
-        console.warn('Fallback to local rounds:', err);
-      }
-    }
-
     checkSession();
     loadRoundsFromDb();
   }, []);
@@ -87,6 +123,7 @@ export default function App() {
   const handleLoginSuccess = (user: UserOut) => {
     setCurrentUser(user);
     setIsLoggedIn(true);
+    loadRoundsFromDb();
     if (user.role === 'admin') {
       setCurrentScreen('admin-leaderboard');
     } else {
@@ -102,14 +139,19 @@ export default function App() {
   };
 
   const handleNavigate = (screen: ScreenView, tab?: 'register' | 'login') => {
-    if (isAdminEditingRounds && screen !== currentScreen) {
-      setPendingNav({ screen, tab });
+    let targetScreen = screen;
+    if (screen === 'student-dashboard' && currentUser?.role === 'admin') {
+      targetScreen = 'admin-leaderboard';
+    }
+
+    if (isAdminEditingRounds && targetScreen !== currentScreen) {
+      setPendingNav({ screen: targetScreen, tab });
       return;
     }
     if (tab) {
       setAuthInitialTab(tab);
     }
-    setCurrentScreen(screen);
+    setCurrentScreen(targetScreen);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -156,75 +198,90 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#fef9ef] flex flex-col font-sans antialiased text-[#1d1c16]">
-      {/* Quick Screen Selector Toolbar (Floating Bar at top for instant screen testing) */}
-      <div className="bg-[#0a0a0a] text-white text-xs py-2 px-4 flex flex-wrap justify-between items-center gap-2 border-b border-white/10 z-50">
-        <div className="flex items-center gap-2 font-bold text-[#e8b94a]">
-          <span className="material-symbols-outlined text-[16px]">touch_app</span>
-          <span>MathQuest Screen Switcher:</span>
+      {/* Quick Screen Selector Toolbar (Floating Bar at top for instant screen testing — Toggleable via Ctrl + `) */}
+      {showSwitcherBar && (
+        <div className="bg-[#0a0a0a] text-white text-xs py-2 px-4 flex flex-wrap justify-between items-center gap-2 border-b border-white/10 z-50 animate-in slide-in-from-top duration-200">
+          <div className="flex items-center gap-2 font-bold text-[#e8b94a]">
+            <span className="material-symbols-outlined text-[16px]">touch_app</span>
+            <span>MathQuest Screen Switcher:</span>
+            <span className="text-[10px] bg-white/15 text-white/70 px-1.5 py-0.5 rounded-md font-mono border border-white/15">
+              Ctrl + `
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              onClick={() => handleNavigate('landing')}
+              className={`px-3 py-1 rounded-full font-semibold transition-all ${
+                currentScreen === 'landing'
+                  ? 'bg-[#ff4d8b] text-white shadow-xs'
+                  : 'bg-white/10 text-white/80 hover:bg-white/20'
+              }`}
+            >
+              1. Landing
+            </button>
+            <button
+              onClick={() => handleNavigate('register')}
+              className={`px-3 py-1 rounded-full font-semibold transition-all ${
+                currentScreen === 'register'
+                  ? 'bg-[#ff6b5a] text-white shadow-xs'
+                  : 'bg-white/10 text-white/80 hover:bg-white/20'
+              }`}
+            >
+              2. Register / Login Page
+            </button>
+            <button
+              onClick={() => handleNavigate('student-dashboard')}
+              className={`px-3 py-1 rounded-full font-semibold transition-all ${
+                currentScreen === 'student-dashboard'
+                  ? 'bg-[#a4d4c5] text-[#0a0a0a] shadow-xs'
+                  : 'bg-white/10 text-white/80 hover:bg-white/20'
+              }`}
+            >
+              3. Student Dashboard
+            </button>
+            <button
+              onClick={() => handleNavigate('quiz')}
+              className={`px-3 py-1 rounded-full font-semibold transition-all ${
+                currentScreen === 'quiz'
+                  ? 'bg-[#feaf83] text-[#0a0a0a] shadow-xs'
+                  : 'bg-white/10 text-white/80 hover:bg-white/20'
+              }`}
+            >
+              4. Quiz Focus Mode
+            </button>
+            <button
+              onClick={() => handleNavigate('admin-rounds')}
+              className={`px-3 py-1 rounded-full font-semibold transition-all ${
+                currentScreen === 'admin-rounds'
+                  ? 'bg-[#b8a4ed] text-[#0a0a0a] shadow-xs'
+                  : 'bg-white/10 text-white/80 hover:bg-white/20'
+              }`}
+            >
+              5. Admin Round Manager
+            </button>
+            <button
+              onClick={() => handleNavigate('admin-leaderboard')}
+              className={`px-3 py-1 rounded-full font-semibold transition-all ${
+                currentScreen === 'admin-leaderboard'
+                  ? 'bg-[#e8b94a] text-[#0a0a0a] shadow-xs'
+                  : 'bg-white/10 text-white/80 hover:bg-white/20'
+              }`}
+            >
+              6. Admin Leaderboard
+            </button>
+            <button
+              onClick={() => handleNavigate('admin-accounts')}
+              className={`px-3 py-1 rounded-full font-semibold transition-all ${
+                currentScreen === 'admin-accounts'
+                  ? 'bg-[#a4d4c5] text-[#0a0a0a] shadow-xs'
+                  : 'bg-white/10 text-white/80 hover:bg-white/20'
+              }`}
+            >
+              7. Kelola Akun
+            </button>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          <button
-            onClick={() => handleNavigate('landing')}
-            className={`px-3 py-1 rounded-full font-semibold transition-all ${
-              currentScreen === 'landing'
-                ? 'bg-[#ff4d8b] text-white shadow-xs'
-                : 'bg-white/10 text-white/80 hover:bg-white/20'
-            }`}
-          >
-            1. Landing
-          </button>
-          <button
-            onClick={() => handleNavigate('register')}
-            className={`px-3 py-1 rounded-full font-semibold transition-all ${
-              currentScreen === 'register'
-                ? 'bg-[#ff6b5a] text-white shadow-xs'
-                : 'bg-white/10 text-white/80 hover:bg-white/20'
-            }`}
-          >
-            2. Register / Login Page
-          </button>
-          <button
-            onClick={() => handleNavigate('student-dashboard')}
-            className={`px-3 py-1 rounded-full font-semibold transition-all ${
-              currentScreen === 'student-dashboard'
-                ? 'bg-[#a4d4c5] text-[#0a0a0a] shadow-xs'
-                : 'bg-white/10 text-white/80 hover:bg-white/20'
-            }`}
-          >
-            3. Student Dashboard
-          </button>
-          <button
-            onClick={() => handleNavigate('quiz')}
-            className={`px-3 py-1 rounded-full font-semibold transition-all ${
-              currentScreen === 'quiz'
-                ? 'bg-[#feaf83] text-[#0a0a0a] shadow-xs'
-                : 'bg-white/10 text-white/80 hover:bg-white/20'
-            }`}
-          >
-            4. Quiz Focus Mode
-          </button>
-          <button
-            onClick={() => handleNavigate('admin-rounds')}
-            className={`px-3 py-1 rounded-full font-semibold transition-all ${
-              currentScreen === 'admin-rounds'
-                ? 'bg-[#b8a4ed] text-[#0a0a0a] shadow-xs'
-                : 'bg-white/10 text-white/80 hover:bg-white/20'
-            }`}
-          >
-            5. Admin Round Manager
-          </button>
-          <button
-            onClick={() => handleNavigate('admin-leaderboard')}
-            className={`px-3 py-1 rounded-full font-semibold transition-all ${
-              currentScreen === 'admin-leaderboard'
-                ? 'bg-[#e8b94a] text-[#0a0a0a] shadow-xs'
-                : 'bg-white/10 text-white/80 hover:bg-white/20'
-            }`}
-          >
-            6. Admin Leaderboard
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* Shared Navigation Bar */}
       <TopNavbar
@@ -267,6 +324,7 @@ export default function App() {
           <LandingView
             onNavigate={handleNavigate}
             isLoggedIn={isLoggedIn}
+            userRole={currentUser?.role}
           />
         )}
 
@@ -320,16 +378,42 @@ export default function App() {
             highlightSaveTrigger={highlightSaveTrigger}
             selectedRoundTitle={selectedRound}
             onSelectRound={setSelectedRound}
+            onShowToast={showToast}
           />
         )}
 
         {currentScreen === 'admin-leaderboard' && (
-          <AdminLeaderboardView onNavigate={handleNavigate} />
+          <AdminLeaderboardView
+            onNavigate={handleNavigate}
+            onSelectParticipant={(participantId) => {
+              setSelectedParticipantId(participantId);
+              handleNavigate('admin-participant-detail');
+            }}
+            onShowToast={showToast}
+          />
+        )}
+
+        {currentScreen === 'admin-participant-detail' && (
+          <AdminParticipantDetailView
+            participantId={selectedParticipantId || 'demo-participant-id'}
+            onNavigate={handleNavigate}
+            onShowToast={showToast}
+          />
+        )}
+
+        {currentScreen === 'admin-accounts' && (
+          <AdminAccountManagerView
+            onNavigate={handleNavigate}
+            onShowToast={showToast}
+          />
         )}
       </div>
 
       {/* Footer (hidden during quiz execution for concentration) */}
       {currentScreen !== 'quiz' && <Footer onNavigate={handleNavigate} />}
+
+      {/* Bubble Chat Toast Notifications Overlay (Bottom Right) */}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
 
       {/* Auth Modal Overlay */}
       {authModal && (

@@ -21,6 +21,22 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   const normalizedCategory = studentCategory.includes('SD') ? 'SD' : studentCategory.includes('SMP') ? 'SMP' : 'SMA';
   const [selectedCategory, setSelectedCategory] = useState<'SD' | 'SMP' | 'SMA'>(normalizedCategory as 'SD' | 'SMP' | 'SMA');
   const [myQuizSessionsList, setMyQuizSessionsList] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isAccountActive, setIsAccountActive] = useState<boolean>(true); // default true to avoid flicker
+  const [hasPassedAnyRound, setHasPassedAnyRound] = useState<boolean>(false);
+  const [hasFailedAnyRound, setHasFailedAnyRound] = useState<boolean>(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const timer = setTimeout(() => {
+      if (isMounted) setIsLoading(false);
+    }, 1200); // Constant 1.2-second realistic skeleton loader after login
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, []);
 
   useEffect(() => {
     const norm = studentCategory.includes('SD') ? 'SD' : studentCategory.includes('SMP') ? 'SMP' : 'SMA';
@@ -38,10 +54,20 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
         // Fallback if unauthenticated / offline
       }
     }
+    async function loadActivationStatus() {
+      try {
+        const status = await apiService.getMyActivationStatus();
+        if (!isMounted) return;
+        setIsAccountActive(status.is_active);
+        setHasPassedAnyRound(status.has_passed_any_round);
+        setHasFailedAnyRound(status.has_failed_any_round);
+      } catch {
+        setIsAccountActive(true); // fail open
+      }
+    }
     loadMySessions();
-    return () => {
-      isMounted = false;
-    };
+    loadActivationStatus();
+    return () => { isMounted = false; };
   }, []);
 
   function getRoundScheduleInfo(round: CompetitionRound) {
@@ -61,7 +87,108 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
     return { isBefore, isAfter, isOpen, sDate, sTime, eDate, eTime };
   }
 
+  function formatTanggalID(dateStr: string, timeStr: string): string {
+    const bulan = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return `${dateStr}, ${timeStr.replace(':', '.')} WIB`;
+    const [tahun, bln, hari] = parts;
+    const namaBulan = bulan[parseInt(bln, 10) - 1] || bln;
+    const jam = timeStr.replace(':', '.');
+    return `${parseInt(hari, 10)} ${namaBulan} ${tahun}, ${jam} WIB`;
+  }
+
   const displayedRounds = rounds.filter((r) => (r.category || 'SD') === selectedCategory);
+
+  if (isLoading) {
+    return (
+      <div className="w-full bg-[#fef9ef] min-h-screen pb-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 lg:pt-10 space-y-10">
+          {/* Welcome Banner Skeleton */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-pulse">
+            <div className="space-y-3">
+              <div className="w-48 h-4 rounded-md bg-[#ff6b5a]/20" />
+              <div className="w-72 sm:w-[480px] h-10 rounded-2xl bg-[#0a0a0a]/15" />
+              <div className="w-64 sm:w-96 h-4 rounded-md bg-[#0a0a0a]/10" />
+            </div>
+            <div className="w-40 h-16 rounded-2xl bg-[#ebe6d6] border border-[#0a0a0a]/10 shrink-0 self-start sm:self-auto" />
+          </div>
+
+          {/* Main 2-Column Layout Skeleton */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+
+            {/* Left Column (2 Cols): Round Cards Stack */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Section Title Skeleton */}
+              <div className="w-64 h-8 rounded-xl bg-[#0a0a0a]/15 animate-pulse" />
+
+              {/* Stacked Horizontal Round Cards Skeleton */}
+              <div className="space-y-5">
+                {[1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className="bg-[#f5f0e0]/70 rounded-[24px] p-5 sm:p-6 border-2 border-[#0a0a0a]/10 clay-shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-pulse"
+                  >
+                    <div className="flex items-start sm:items-center gap-4 flex-1">
+                      {/* Left Square Icon Box */}
+                      <div className="w-12 h-12 rounded-2xl bg-[#0a0a0a]/10 shrink-0" />
+                      {/* Middle Information */}
+                      <div className="space-y-2.5 flex-1">
+                        <div className="w-48 sm:w-64 h-6 rounded-lg bg-[#0a0a0a]/15" />
+                        <div className="w-36 h-5 rounded-full bg-[#a4d4c5]/40" />
+                        <div className="w-56 sm:w-80 h-3.5 rounded-md bg-[#0a0a0a]/10" />
+                      </div>
+                    </div>
+                    {/* Right Action Pill Button */}
+                    <div className="w-full sm:w-44 h-11 rounded-2xl bg-[#0a0a0a]/15 shrink-0" />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Right Column (1 Col): Qualification Card & Agenda Card */}
+            <div className="space-y-6">
+
+              {/* Qualification Status Card Skeleton */}
+              <div className="bg-[#ffdcd0]/70 rounded-[28px] p-6 border-2 border-[#0a0a0a]/10 clay-shadow-sm space-y-4 animate-pulse">
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 rounded-md bg-[#ff6b5a]/30" />
+                  <div className="w-36 h-5 rounded-md bg-[#0a0a0a]/15" />
+                </div>
+                <div className="bg-white/80 rounded-2xl p-4 space-y-2 border border-[#0a0a0a]/5">
+                  <div className="w-28 h-3.5 rounded-md bg-[#0a0a0a]/10" />
+                  <div className="w-44 h-5 rounded-lg bg-[#0a0a0a]/15" />
+                </div>
+                <div className="w-full h-8 rounded-md bg-[#0a0a0a]/10" />
+              </div>
+
+              {/* Agenda OPTIMA Card Skeleton */}
+              <div className="bg-[#f5f0e0]/70 rounded-[28px] p-6 border-2 border-[#0a0a0a]/10 clay-shadow-sm space-y-5 animate-pulse">
+                <div className="w-44 h-6 rounded-md bg-[#0a0a0a]/15" />
+
+                {/* 3 Agenda Items */}
+                <div className="space-y-4 pt-1">
+                  {[1, 2, 3].map((item) => (
+                    <div key={item} className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-2xl bg-[#a4d4c5]/40 shrink-0" />
+                      <div className="space-y-1.5 flex-1">
+                        <div className="w-36 h-4 rounded-md bg-[#0a0a0a]/15" />
+                        <div className="w-28 h-3 rounded-md bg-[#0a0a0a]/10" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full bg-[#fef9ef] min-h-screen pb-20">
@@ -73,7 +200,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               OPTIMA MATRIX 2026 • PORTAL PESERTA
             </span>
             <h1 className="text-3xl sm:text-5xl font-bold text-[#0a0a0a] tracking-tight mb-2">
-              Selamat datang kembali, {studentName}!
+              Selamat datang kembali,<br></br> {studentName}!
             </h1>
             <p className="text-base text-[#6a6a6a] max-w-2xl">
               Siapkan diri Anda untuk mengikuti rangkaian babak Olimpiade Prestasi Matematika 2026 Se-Pulau Jawa.
@@ -134,15 +261,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                           <span className="material-symbols-outlined text-[#6a6a6a] text-4xl">
                             check_circle
                           </span>
-                          {idx === 0 && (
-                            <div className="absolute -top-6 -left-4 w-12 h-12 pointer-events-none">
-                              <img
-                                src={ASSET_IMAGES.starPeek}
-                                alt="Star Mascot"
-                                className="w-full h-full object-contain"
-                              />
-                            </div>
-                          )}
+
                         </div>
 
                         <div className="flex-grow">
@@ -189,8 +308,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                             </div>
                             <div>
                               <div className="flex items-center gap-2 flex-wrap mb-1">
-                                <span className="bg-[#0a0a0a] text-white text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider shadow-2xs">
-                                  BABAK AKTIF
+                                <span className={`text-white text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider shadow-2xs ${isAfter ? 'bg-[#ba1a1a]' : isBefore ? 'bg-[#6a6a6a]' : 'bg-[#0a0a0a]'
+                                  }`}>
+                                  {isAfter ? 'BABAK DITUTUP' : isBefore ? 'BELUM DIMULAI' : 'BABAK AKTIF'}
                                 </span>
                                 {isOngoingSession && (
                                   <span className="bg-[#ba1a1a] text-white text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider animate-pulse shadow-2xs">
@@ -224,7 +344,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
                         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pt-4 border-t-2 border-[#0a0a0a]/15 relative z-10">
                           <div className="text-xs text-[#0a0a0a]/80 font-bold">
-                            Jadwal Ujian: <strong className="text-[#0a0a0a] font-black">{sDate} ({sTime} WIB) s.d {eDate} ({eTime} WIB)</strong>
+                            Jadwal Ujian: <strong className="text-[#0a0a0a] font-black">{formatTanggalID(sDate, sTime)} s.d {formatTanggalID(eDate, eTime)}</strong>
                           </div>
 
                           {!isOffline && (
@@ -238,6 +358,16 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                                 >
                                   <span className="material-symbols-outlined text-sm text-[#a4d4c5]">check_circle</span>
                                   <span>Quiz Sudah Selesai Dikerjakan</span>
+                                </button>
+                              ) : !isAccountActive ? (
+                                <button
+                                  type="button"
+                                  disabled
+                                  className="w-full sm:w-auto bg-[#ff6b5a]/20 text-[#ff6b5a] font-extrabold px-6 py-3.5 rounded-2xl text-xs sm:text-sm flex items-center justify-center gap-2 cursor-not-allowed border-2 border-[#ff6b5a]/30"
+                                  title="Akun Anda belum diaktivasi oleh admin. Hubungi panitia OPTIMA untuk konfirmasi pendaftaran."
+                                >
+                                  <span className="material-symbols-outlined text-sm">lock</span>
+                                  <span>Akun Belum Diaktivasi</span>
                                 </button>
                               ) : isOngoingSession ? (
                                 <button
@@ -316,7 +446,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                           )}
                         </div>
                         <p className="text-sm text-[#6a6a6a]">
-                          Terbuka untuk 10 peserta terbaik yang lolos dari babak penyisihan.
+                          {round.title.toLowerCase().includes('final')
+                            ? 'Terbuka untuk peserta yang lolos dari babak sebelumnya.'
+                            : 'Babak ini akan dapat diakses saat waktu pelaksanaannya tiba.'}
                         </p>
                       </div>
 
@@ -334,28 +466,106 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
           {/* Right Sidebar */}
           <div className="lg:col-span-4 space-y-6">
-            {/* Qualification Status Card */}
-            <div className="bg-[#ffdbca] rounded-2xl p-6 shadow-lg relative overflow-hidden group">
-              <div className="relative z-10">
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="material-symbols-outlined text-[#8b4f2b]">campaign</span>
-                  <h2 className="font-bold text-base text-[#6e3816]">Status Kualifikasi</h2>
-                </div>
+            {/* Account Activation Status Card — shown when account is NOT active */}
+            {!isAccountActive ? (
+              <div className="bg-[#ff6b5a] rounded-[28px] p-5 sm:p-6 relative overflow-hidden border-2 border-[#0a0a0a] clay-shadow">
+                <div className="relative z-10">
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className="w-10 h-10 rounded-[14px] bg-[#0a0a0a] flex items-center justify-center shrink-0 clay-shadow-sm">
+                      <span className="material-symbols-outlined text-[#ff6b5a] text-[20px]">hourglass_empty</span>
+                    </div>
+                    <h2 className="font-bold text-[18px] text-[#0a0a0a] tracking-tight">Status Akun</h2>
+                  </div>
 
-                <div className="bg-white/50 backdrop-blur-sm rounded-xl p-4 border border-white/40 mb-4">
-                  <p className="text-sm text-[#6e3816]">
-                    Pengumuman resmi: <br />
-                    <strong className="text-[#0a0a0a] font-black text-base">
-                      "Anda lolos ke Penyisihan 2!"
-                    </strong>
+                  <div className="bg-[#ffe3dd] rounded-[20px] p-5 border-2 border-[#0a0a0a]/10">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="w-2 h-2 rounded-full bg-[#f59e0b] animate-pulse shrink-0" />
+                      <p className="text-[11px] font-bold uppercase tracking-[1.5px] text-[#0a0a0a]/60">Verifikasi Admin</p>
+                    </div>
+                    <h3 className="text-[15px] font-bold text-[#0a0a0a] leading-[1.3] mb-1.5">
+                      Menunggu verifikasi pembayaran
+                    </h3>
+                    <p className="text-[13px] text-[#0a0a0a]/80 leading-[1.5]">
+                      Panitia sedang memeriksa kelengkapan data Anda. Akun akan diaktifkan setelah pengecekan selesai.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : hasPassedAnyRound ? (
+              /* Qualification Status Card — shown after passing any round */
+              <div className="bg-[#a4d4c5] rounded-[28px] p-5 sm:p-6 shadow-lg relative overflow-hidden group border-2 border-[#0a0a0a] clay-shadow">
+                <div className="absolute -right-4 -top-4 w-32 h-32 bg-white/40 rounded-full blur-2xl group-hover:scale-110 transition-transform duration-500" />
+                <div className="relative z-10">
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className="w-10 h-10 rounded-[14px] bg-[#0a0a0a] flex items-center justify-center shrink-0 clay-shadow-sm">
+                      <span className="material-symbols-outlined text-[#a4d4c5] text-[20px]">workspace_premium</span>
+                    </div>
+                    <h2 className="font-bold text-[18px] text-[#0a0a0a] tracking-tight">Status Kualifikasi</h2>
+                  </div>
+                  <div className="bg-white/60 backdrop-blur-sm rounded-[20px] p-5 border-2 border-[#0a0a0a]/10 mb-4">
+                    <p className="text-sm text-[#0a0a0a]">
+                      Selamat! Anda dinyatakan <strong className="text-[#0a0a0a] font-black text-base uppercase bg-white px-2 py-0.5 rounded-md border border-[#0a0a0a]/15 shadow-sm ml-1 mr-1">lolos</strong> ke babak berikutnya.<br />
+                      <span className="text-[#0a0a0a]/80 font-medium text-xs mt-2 block leading-relaxed">
+                        Persiapkan diri Anda sebaik mungkin untuk menghadapi tantangan di tahap selanjutnya.
+                      </span>
+                    </p>
+                  </div>
+                  <p className="text-xs text-[#0a0a0a] font-bold leading-relaxed flex items-start gap-2">
+                    <span className="material-symbols-outlined text-[18px] shrink-0">rocket_launch</span>
+                    <span>Terus semangat dan pertahankan prestasimu!</span>
                   </p>
                 </div>
-
-                <p className="text-xs text-[#6e3816]/90 leading-relaxed">
-                  Hasil Anda di babak sebelumnya menempatkan Anda di 15% peserta teratas. Pertahankan prestasi ini!
-                </p>
               </div>
-            </div>
+            ) : hasFailedAnyRound ? (
+              /* Qualification Status Card — shown after failing a round */
+              <div className="bg-[#ff6b5a] rounded-[28px] p-5 sm:p-6 shadow-lg relative overflow-hidden group border-2 border-[#0a0a0a] clay-shadow">
+                <div className="absolute -right-4 -top-4 w-32 h-32 bg-white/20 rounded-full blur-2xl group-hover:scale-110 transition-transform duration-500" />
+                <div className="relative z-10">
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className="w-10 h-10 rounded-[14px] bg-[#0a0a0a] flex items-center justify-center shrink-0 clay-shadow-sm">
+                      <span className="material-symbols-outlined text-[#ff6b5a] text-[20px]">cancel</span>
+                    </div>
+                    <h2 className="font-bold text-[18px] text-[#0a0a0a] tracking-tight">Status Kualifikasi</h2>
+                  </div>
+                  <div className="bg-[#ffe3dd] rounded-[20px] p-5 border-2 border-[#0a0a0a]/10 mb-4">
+                    <p className="text-sm text-[#0a0a0a]">
+                      Mohon maaf, Anda <strong className="text-[#ff6b5a] font-black text-base uppercase">tidak lolos</strong> ke babak selanjutnya.<br />
+                      <span className="text-[#0a0a0a]/70 font-medium text-xs mt-2 block leading-relaxed">
+                        Terima kasih atas partisipasi dan perjuangan luar biasa Anda di OPTIMA 2026.
+                      </span>
+                    </p>
+                  </div>
+                  <p className="text-xs text-[#0a0a0a] font-bold leading-relaxed flex items-start gap-2">
+                    <span className="material-symbols-outlined text-[18px] shrink-0">psychology</span>
+                    <span>Jangan menyerah dan sampai jumpa di kompetisi berikutnya! Tetap semangat belajar.</span>
+                  </p>
+                </div>
+              </div>
+            ) : (
+              /* Active but not passed — show friendly status card */
+              <div className="bg-[#a4d4c5] rounded-2xl p-6 shadow-lg relative overflow-hidden border-2 border-[#0a0a0a]/10 clay-shadow">
+                <div className="relative z-10">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-8 h-8 rounded-xl bg-[#0a0a0a] flex items-center justify-center">
+                      <span className="material-symbols-outlined text-[#a4d4c5] text-lg">verified</span>
+                    </div>
+                    <h2 className="font-bold text-base text-[#0a0a0a]">Status Akun</h2>
+                  </div>
+                  <div className="bg-white/60 rounded-xl p-4 border border-white/40 mb-4">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-[#0a0a0a] shrink-0" />
+                      <p className="text-xs font-black uppercase text-[#0a0a0a] tracking-wide">Akun Terverifikasi</p>
+                    </div>
+                    <p className="text-sm font-bold text-[#0a0a0a] mt-1">
+                      Akun Anda sudah aktif. Selamat mengikuti kompetisi!
+                    </p>
+                  </div>
+                  <p className="text-xs text-[#0a0a0a]/70 leading-relaxed">
+                    Ikuti babak kompetisi sesuai jadwal. Semangat!
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Upcoming Agenda Card */}
             <div className="bg-[#f5f0e0] rounded-2xl p-6 border border-[#e7e2d8]">

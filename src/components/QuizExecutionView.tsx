@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ScreenView, Question, CompetitionRound } from '../types';
 import { MOCK_QUESTIONS, ASSET_IMAGES } from '../data/mockData';
 import { apiService } from '../services/api';
+import { MathText } from './MathText';
+import { QuizTutorialModal } from './QuizTutorialModal';
 
 interface QuizExecutionViewProps {
   onNavigate: (screen: ScreenView) => void;
@@ -17,8 +19,9 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
   questions: propQuestions
 }) => {
   const [currentIdx, setCurrentIdx] = useState(0);
-  const [userAnswers, setUserAnswers] = useState<Record<number, 'A' | 'B' | 'C' | 'D'>>({});
-  const [flagged, setFlagged] = useState<Record<number, boolean>>({});
+  const [userAnswers, setUserAnswers] = useState<Record<string | number, string>>({});
+  const [flagged, setFlagged] = useState<Record<string | number, boolean>>({});
+  const [sessionId, setSessionId] = useState<string | null>(null);
 
   const [loadingQuestions, setLoadingQuestions] = useState<boolean>(true);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -29,8 +32,32 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
   const [timeLeft, setTimeLeft] = useState<number>(durationMins * 60);
   const [tabSwitches, setTabSwitches] = useState<number>(0);
   const [showAntiCheatModal, setShowAntiCheatModal] = useState<boolean>(false);
+  const [showTutorialModal, setShowTutorialModal] = useState<boolean>(true);
+  const [showSubmitConfirmModal, setShowSubmitConfirmModal] = useState<boolean>(false);
   const [lastActivityLog, setLastActivityLog] = useState<string>('');
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
+  const [isIsianFocused, setIsIsianFocused] = useState<boolean>(false);
+
+  // Ref to prevent double-triggering when both 'blur' and 'visibilitychange' fire for 1 tab switch
+  const lastViolationTimeRef = useRef<number>(0);
+
+  const userAnswersRef = useRef(userAnswers);
+  const isianInputRef = useRef<HTMLInputElement>(null);
+  const flaggedRef = useRef(flagged);
+
+  useEffect(() => {
+    userAnswersRef.current = userAnswers;
+    if (sessionId) {
+      localStorage.setItem(`optima_ans_${sessionId}`, JSON.stringify(userAnswers));
+    }
+  }, [userAnswers, sessionId]);
+
+  useEffect(() => {
+    flaggedRef.current = flagged;
+    if (sessionId) {
+      localStorage.setItem(`optima_flg_${sessionId}`, JSON.stringify(flagged));
+    }
+  }, [flagged, sessionId]);
 
   // Anti-Cheat: Disable Copy, Paste & Context Menu
   useEffect(() => {
@@ -44,6 +71,16 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
       document.removeEventListener('paste', preventAction);
     };
   }, []);
+
+  const isModalOpen = showAntiCheatModal || showSubmitConfirmModal;
+  useEffect(() => {
+    if (isModalOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [isModalOpen]);
 
   // UUID validation helper — mock IDs like "round-sd-1" are not valid UUIDs
   const isValidUUID = (id: string) =>
@@ -60,18 +97,38 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
 
       if (isRealRound) {
         try {
-          // 1. Start or resume Quiz Session from Backend Server
-          const session = await apiService.startQuizSession(roundId).catch(() => null);
+          let session;
+          try {
+            session = await apiService.startQuizSession(roundId);
+          } catch (err: any) {
+            if (!isMounted) return;
+            console.error('Quiz start failed:', err);
+            alert(err.message || 'Gagal memulai kuis. Silakan periksa kembali status akun Anda.');
+            onNavigate('student-dashboard');
+            return;
+          }
+
           if (!isMounted) return;
 
           if (session) {
+            setSessionId(session.session_id);
             setTimeLeft(session.remaining_seconds);
             setTabSwitches(session.tab_switch_count);
             if (session.is_submitted) {
               setIsSubmitted(true);
             }
-          } else {
-            setTimeLeft((activeRound.durationMinutes || 60) * 60);
+
+            // Restore state from local storage using unique session_id
+            const savedAns = localStorage.getItem(`optima_ans_${session.session_id}`);
+            if (savedAns) setUserAnswers(JSON.parse(savedAns));
+
+            const savedFlg = localStorage.getItem(`optima_flg_${session.session_id}`);
+            if (savedFlg) setFlagged(JSON.parse(savedFlg));
+            
+            const hasSeenTut = localStorage.getItem(`optima_tut_${session.session_id}`);
+            if (hasSeenTut === 'true' || session.is_submitted) {
+              setShowTutorialModal(false);
+            }
           }
 
           // 2. Fetch Questions WITHOUT correct_key (Secure Anti-Cheat Endpoint)
@@ -79,9 +136,10 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
           if (!isMounted) return;
           if (dbQuestions && dbQuestions.length > 0) {
             const formatted: Question[] = dbQuestions.map((q, idx) => ({
-              id: idx + 1,
+              id: q.id as string,
               code: `SOAL ${idx + 1} • ${(activeRound.category || studentCategory || 'SD').toUpperCase()}`,
               text: q.question_text,
+              type: q.question_type as 'PG' | 'ISIAN',
               diagramUrl: q.image_url,
               options: (q.options || []).map((opt) => ({
                 id: (opt.key || 'A').toUpperCase() as 'A' | 'B' | 'C' | 'D',
@@ -115,14 +173,14 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
 
   // Timer Countdown effect
   useEffect(() => {
-    if (isSubmitted || loadingQuestions) return;
+    if (isSubmitted || loadingQuestions || showTutorialModal) return;
     const interval = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(interval);
           setIsSubmitted(true);
           if (activeRound?.id && isValidUUID(activeRound.id)) {
-            apiService.submitQuizAnswers(activeRound.id, userAnswers).catch(() => {});
+            apiService.submitQuizAnswers(activeRound.id, userAnswersRef.current).catch(() => {});
           }
           alert('Waktu pengerjaan telah habis! Jawaban Anda telah otomatis dikumpulkan ke server.');
           return 0;
@@ -131,15 +189,22 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [isSubmitted, loadingQuestions, activeRound, userAnswers]);
+  }, [isSubmitted, loadingQuestions, showTutorialModal, activeRound]);
 
-  // Tab switch & Window Focus Mode Listener with Server Log
+  // Tab switch & Window Focus Mode Listener with Server Log (Debounced)
   useEffect(() => {
-    if (isSubmitted || loadingQuestions) return;
+    if (isSubmitted || loadingQuestions || showTutorialModal) return;
 
     const handleBlur = async () => {
-      const now = new Date();
-      setLastActivityLog(now.toLocaleTimeString());
+      const now = Date.now();
+      // Debounce: ignore duplicate triggers occurring within 1.5 seconds (prevents double count from blur + visibilitychange)
+      if (now - lastViolationTimeRef.current < 1500) {
+        return;
+      }
+      lastViolationTimeRef.current = now;
+
+      const dateObj = new Date();
+      setLastActivityLog(dateObj.toLocaleTimeString());
       setShowAntiCheatModal(true);
 
       if (activeRound?.id && isValidUUID(activeRound.id)) {
@@ -148,18 +213,25 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
           setTabSwitches(res.tab_switch_count);
           if (res.is_submitted) {
             setIsSubmitted(true);
+            await apiService.submitQuizAnswers(activeRound.id, userAnswersRef.current).catch(() => {});
           }
         } catch {
           setTabSwitches((prev) => {
             const nextCount = prev + 1;
-            if (nextCount >= maxSwitches) setIsSubmitted(true);
+            if (nextCount >= maxSwitches) {
+              setIsSubmitted(true);
+              apiService.submitQuizAnswers(activeRound.id, userAnswersRef.current).catch(() => {});
+            }
             return nextCount;
           });
         }
       } else {
         setTabSwitches((prev) => {
           const nextCount = prev + 1;
-          if (nextCount >= maxSwitches) setIsSubmitted(true);
+          if (nextCount >= maxSwitches) {
+            setIsSubmitted(true);
+            if (activeRound?.id) apiService.submitQuizAnswers(activeRound.id, userAnswersRef.current).catch(() => {});
+          }
           return nextCount;
         });
       }
@@ -177,7 +249,7 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
       window.removeEventListener('blur', handleBlur);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [isSubmitted, loadingQuestions, maxSwitches, activeRound]);
+  }, [isSubmitted, loadingQuestions, showTutorialModal, maxSwitches, activeRound]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -202,12 +274,18 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
   const activeQuestions = questions.length > 0 ? questions : MOCK_QUESTIONS;
   const currentQ = activeQuestions[currentIdx] || activeQuestions[0];
 
-  const handleSelectOption = (optId: 'A' | 'B' | 'C' | 'D') => {
+  // Normalize ISIAN answer: lowercase all LaTeX command names to fix
+  // browser autocorrect that converts \sqrt → \SQRT or \Sqrt.
+  // Also trims extra whitespace.
+  const normalizeIsianAnswer = (val: string): string => {
+    return val
+      .replace(/\\([A-Z][a-zA-Z]*)/g, (_, cmd) => `\\${cmd.toLowerCase()}`)
+      .trimStart();
+  };
+
+  const handleSelectOption = (optId: string) => {
     if (isSubmitted) return;
-    setUserAnswers((prev) => ({
-      ...prev,
-      [currentQ.id]: optId
-    }));
+    setUserAnswers((prev) => ({ ...prev, [currentQ.id]: normalizeIsianAnswer(optId) }));
   };
 
   const toggleFlagCurrent = () => {
@@ -218,19 +296,34 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
     }));
   };
 
-  const handleSubmitQuiz = async () => {
-    if (window.confirm('Apakah Anda yakin ingin mengumpulkan kuis Anda?')) {
-      setIsSubmitted(true);
-      if (activeRound?.id && isValidUUID(activeRound.id)) {
-        try {
-          await apiService.submitQuizAnswers(activeRound.id, userAnswers);
-        } catch (err) {
-          console.warn('Backend quiz submit error:', err);
-        }
-      }
-      alert('Kuis berhasil dikumpulkan dan dinilai secara aman di server!');
-      onNavigate('student-dashboard');
+  const insertMathNotation = (notation: string, cursorOffset: number) => {
+    if (isSubmitted) return;
+    const currentVal = userAnswers[currentQ.id] || '';
+    const inputEl = isianInputRef.current;
+    
+    let startPos = currentVal.length;
+    let endPos = currentVal.length;
+    
+    if (inputEl) {
+      startPos = inputEl.selectionStart ?? currentVal.length;
+      endPos = inputEl.selectionEnd ?? currentVal.length;
     }
+
+    const newVal = currentVal.slice(0, startPos) + notation + currentVal.slice(endPos);
+    setUserAnswers((prev) => ({ ...prev, [currentQ.id]: newVal }));
+
+    // Setelah state di-update, kembalikan fokus dan geser kursor
+    if (inputEl) {
+      setTimeout(() => {
+        inputEl.focus();
+        inputEl.setSelectionRange(startPos + cursorOffset, startPos + cursorOffset);
+      }, 10);
+    }
+  };
+
+  const handleSubmitQuiz = async () => {
+    if (isSubmitted) return;
+    setShowSubmitConfirmModal(true);
   };
 
   return (
@@ -286,69 +379,148 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
               <span className="bg-[#a4d4c5] text-[#0a0a0a] px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider w-fit">
                 {currentQ.code || `SOAL ${currentQ.id}`}
               </span>
-              <h1 className="text-lg sm:text-xl font-bold text-[#000000] leading-snug">
-                {currentQ.text}
+              <h1 className="text-lg sm:text-xl font-normal text-[#0a0a0a] leading-relaxed whitespace-pre-line">
+                <MathText text={currentQ.text} />
               </h1>
               {currentQ.note && (
                 <p className="text-sm text-[#6a6a6a] italic">
-                  {currentQ.note}
+                  <MathText text={currentQ.note} />
                 </p>
               )}
             </div>
 
             {/* 3D Diagram Container */}
             {currentQ.diagramUrl && (
-              <div className="w-full md:w-64 h-64 bg-[#f8f3e9] rounded-2xl flex items-center justify-center relative border border-[#c4c7c7]/30 shrink-0">
+              <div className="w-full md:w-64 h-64 bg-[#f8f3e9] rounded-2xl flex items-center justify-center relative border border-[#c4c7c7]/30 shrink-0 p-3">
                 <img
                   src={currentQ.diagramUrl}
-                  alt="Diagram Soal 3D"
-                  className="w-48 h-48 object-contain drop-shadow-xl hover:scale-105 transition-transform"
+                  alt="Diagram Soal"
+                  className="w-full h-full object-contain drop-shadow-md hover:scale-105 transition-transform"
                 />
-                <div className="absolute bottom-3 right-3 bg-[#0a0a0a]/10 px-2 py-0.5 rounded-lg backdrop-blur-sm">
-                  <span className="text-[10px] font-bold text-[#0a0a0a]/70">
-                    {currentQ.figLabel || `GAMBAR ${currentQ.id}`}
-                  </span>
-                </div>
               </div>
             )}
           </div>
 
-          {/* Options Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {currentQ.options.map((opt) => {
-              const isSelected = userAnswers[currentQ.id] === opt.id;
-              return (
-                <button
-                  key={opt.id}
+          {currentQ.type === 'ISIAN' ? (
+            <div className="w-full mt-4">
+              {/* Wrapper container — looks like an input field */}
+              <div
+                className={`relative w-full bg-white border-2 rounded-2xl clay-shadow-sm transition-colors min-h-[68px] flex items-center cursor-text ${
+                  isIsianFocused ? 'border-[#a4d4c5]' : 'border-[#e7e2d8]'
+                } ${isSubmitted ? 'opacity-50 cursor-default' : ''}`}
+                onClick={() => {
+                  if (!isSubmitted) isianInputRef.current?.focus();
+                }}
+              >
+                {/* Hidden input — transparent but receives all keyboard events */}
+                <input
+                  ref={isianInputRef}
+                  type="text"
                   disabled={isSubmitted}
-                  onClick={() => handleSelectOption(opt.id)}
-                  className={`group flex items-center gap-4 p-4 rounded-[16px] text-left transition-all cursor-pointer ${
-                    isSelected
-                      ? 'bg-[#feaf83]/10 border-2 border-[#feaf83] clay-shadow ring-4 ring-[#feaf83]/10'
-                      : 'bg-white border-2 border-transparent clay-shadow-sm hover:border-[#a4d4c5] active:scale-[0.98]'
-                  }`}
-                >
-                  <div
-                    className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-base transition-colors shrink-0 ${
-                      isSelected
-                        ? 'bg-[#e8b94a] text-[#0a0a0a]'
-                        : 'bg-[#e7e2d8] text-[#0a0a0a] group-hover:bg-[#a4d4c5]'
-                    }`}
-                  >
-                    {opt.id}
-                  </div>
-                  <span className={`text-sm sm:text-base ${isSelected ? 'font-bold text-[#0a0a0a]' : 'font-medium text-[#1d1c16]'}`}>
-                    {opt.text}
-                  </span>
-                  {isSelected && (
-                    <span className="ml-auto material-symbols-outlined text-[#e8b94a]">
-                      check_circle
+                  value={userAnswers[currentQ.id] || ''}
+                  onChange={(e) => handleSelectOption(e.target.value)}
+                  onFocus={() => setIsIsianFocused(true)}
+                  onBlur={() => setIsIsianFocused(false)}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-text rounded-2xl"
+                  style={{ caretColor: 'transparent' }}
+                  // Disable browser auto-transformations that corrupt LaTeX commands
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                />
+
+                {/* Always-rendered KaTeX display — user NEVER sees raw LaTeX */}
+                <div className="relative px-4 sm:px-5 py-4 pr-[185px] sm:pr-[225px] text-base sm:text-lg font-bold text-[#0a0a0a] w-full pointer-events-none select-none">
+                  {userAnswers[currentQ.id] ? (
+                    <span className="inline-flex items-center flex-wrap gap-x-1">
+                      <MathText text={`$${userAnswers[currentQ.id]}$`} />
+                      {/* Blinking cursor when focused */}
+                      {isIsianFocused && (
+                        <span className="inline-block w-0.5 h-5 bg-[#0a0a0a] align-middle animate-pulse rounded-full" />
+                      )}
+                    </span>
+                  ) : (
+                    <span className="text-base font-normal text-[#9a9a9a]">
+                      {isIsianFocused ? '' : 'Klik untuk mengetik jawaban...'}
                     </span>
                   )}
-                </button>
-              );
-            })}
-          </div>
+                </div>
+
+                {/* Math Notation Toolbar */}
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 sm:gap-1.5 p-1 sm:p-1.5 bg-[#f5f0e0] rounded-xl border border-[#e7e2d8] shadow-sm z-20">
+                  {[
+                    // offset = placed AFTER the full notation (not inside braces)
+                    // because with invisible cursor, users can't tell they're inside {}
+                    // and accidentally type everything inside the braces.
+                    // Users type the argument first (e.g. "21"), then wrap with √.
+                    { label: '√', notation: '\\sqrt{}', offset: 7, title: 'Akar Kuadrat — ketik angka lalu pilih √, atau klik √ lalu ketik di dalam {}' },
+                    { label: 'π', notation: '\\pi{}', offset: 5, title: 'Pi' },
+                    { label: '±', notation: '\\pm{}', offset: 5, title: 'Kurang Lebih' },
+                  ].map((btn, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      disabled={isSubmitted}
+                      onMouseDown={(e) => {
+                        // onMouseDown + preventDefault keeps focus on the hidden input
+                        // so cursor position is preserved when notation is inserted
+                        e.preventDefault();
+                        insertMathNotation(btn.notation, btn.offset);
+                      }}
+                      title={btn.title}
+                      className="w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center bg-white hover:bg-[#a4d4c5] active:scale-95 text-[#0a0a0a] font-bold rounded-lg text-xs sm:text-sm border border-[#e7e2d8] shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      {btn.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <p className="text-sm text-[#6a6a6a] mt-2 ml-1">
+                <span className="material-symbols-outlined text-[14px] align-middle mr-1">info</span>
+                Gunakan tombol notasi di kanan, atau ketik angka langsung. Jawaban dirender otomatis.
+              </p>
+            </div>
+          ) : (
+
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              {currentQ.options?.map((opt) => {
+                const isSelected = userAnswers[currentQ.id] === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    disabled={isSubmitted}
+                    onClick={() => handleSelectOption(opt.id)}
+                    className={`group flex items-center gap-4 p-4 rounded-[16px] text-left transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-[#feaf83]/10 border-2 border-[#feaf83] clay-shadow ring-4 ring-[#feaf83]/10'
+                        : 'bg-white border-2 border-transparent clay-shadow-sm hover:border-[#a4d4c5] active:scale-[0.98]'
+                    }`}
+                  >
+                    <div
+                      className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-base transition-colors shrink-0 ${
+                        isSelected
+                          ? 'bg-[#e8b94a] text-[#0a0a0a]'
+                          : 'bg-[#e7e2d8] text-[#0a0a0a] group-hover:bg-[#a4d4c5]'
+                      }`}
+                    >
+                      {opt.id}
+                    </div>
+                    <span className={`text-sm sm:text-base ${isSelected ? 'font-bold text-[#0a0a0a]' : 'font-medium text-[#1d1c16]'}`}>
+                      <MathText text={opt.text} />
+                    </span>
+                    {isSelected && (
+                      <span className="ml-auto material-symbols-outlined text-[#e8b94a]">
+                        check_circle
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* Navigation Controls */}
           <div className="flex justify-between items-center mt-4">
@@ -417,7 +589,7 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
                   onClick={() => setCurrentIdx(idx)}
                   className={`w-full aspect-square rounded-lg text-xs flex items-center justify-center transition-transform active:scale-90 cursor-pointer ${btnStyle}`}
                 >
-                  {q.id}
+                  {idx + 1}
                   {isFlagged && !isCurrent && (
                     <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-[#ba1a1a] rounded-full" />
                   )}
@@ -444,7 +616,7 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
         </aside>
       </main>
 
-      {/* Overlay Modal: Anti-Cheat Warning Modal */}
+      {/* Anti Cheat Violation Modal */}
       {showAntiCheatModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div 
@@ -518,6 +690,61 @@ export const QuizExecutionView: React.FC<QuizExecutionViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Submit Confirm Modal */}
+      {showSubmitConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+          <div className="fixed inset-0 bg-[#0a0a0a]/70 backdrop-blur-xs animate-in fade-in duration-300" />
+          <div className="relative bg-[#fef9ef] max-w-sm w-full rounded-[32px] p-6 border-2 border-[#0a0a0a] shadow-2xl z-10 animate-in zoom-in-95 duration-300 text-center space-y-4">
+            <div className="w-16 h-16 rounded-3xl bg-[#ffaf83] border-2 border-[#0a0a0a] flex items-center justify-center mx-auto mb-2 clay-shadow-sm">
+              <span className="material-symbols-outlined text-3xl text-[#0a0a0a]">assignment_turned_in</span>
+            </div>
+            <h3 className="text-xl sm:text-2xl font-black text-[#0a0a0a] leading-tight">Kumpulkan Kuis?</h3>
+            <p className="text-sm font-bold text-[#3a3a3a] leading-relaxed mb-4">
+              Apakah Anda yakin ingin mengumpulkan kuis Anda? Jawaban tidak dapat diubah lagi setelah dikumpulkan.
+            </p>
+            <div className="flex gap-3 justify-center mt-6">
+              <button
+                onClick={() => setShowSubmitConfirmModal(false)}
+                className="px-5 py-3 rounded-xl border-2 border-[#0a0a0a] bg-[#f2ede4] font-bold text-[#0a0a0a] text-sm flex-1 hover:bg-[#e7e2d8] transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                onClick={async () => {
+                  setShowSubmitConfirmModal(false);
+                  setIsSubmitted(true);
+                  if (activeRound?.id && isValidUUID(activeRound.id)) {
+                    try {
+                      await apiService.submitQuizAnswers(activeRound.id, userAnswersRef.current);
+                    } catch (err) {
+                      console.warn('Backend quiz submit error:', err);
+                    }
+                  }
+                  onNavigate('student-dashboard');
+                }}
+                className="px-5 py-3 rounded-xl border-2 border-[#0a0a0a] bg-[#0a0a0a] font-bold text-white text-sm flex-1 hover:bg-[#0a0a0a]/90 transition-colors clay-button-active"
+              >
+                Kumpulkan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Interactive Walkthrough Tutorial Modal Before Quiz Timer Starts */}
+      <QuizTutorialModal
+        isOpen={showTutorialModal && !loadingQuestions}
+        onComplete={() => {
+          setShowTutorialModal(false);
+          if (sessionId) {
+            localStorage.setItem(`optima_tut_${sessionId}`, 'true');
+          }
+        }}
+        activeRoundTitle={activeRound?.title || 'Babak Penyisihan 1 (SD)'}
+        durationMinutes={durationMins}
+        maxSwitches={maxSwitches}
+      />
     </div>
   );
 };

@@ -6,13 +6,25 @@ interface LandingViewProps {
   onNavigate: (screen: ScreenView) => void;
   onRegisterSuccess?: (userData: any) => void;
   isLoggedIn?: boolean;
+  userRole?: string;
 }
 
 export const LandingView: React.FC<LandingViewProps> = ({
   onNavigate,
-  isLoggedIn = false
+  isLoggedIn = false,
+  userRole,
 }) => {
   const [ruleModalCategory, setRuleModalCategory] = useState<'sd-smp' | 'sma' | null>(null);
+  const dashboardScreen: ScreenView = userRole === 'admin' ? 'admin-leaderboard' : 'student-dashboard';
+
+  React.useEffect(() => {
+    if (ruleModalCategory) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [ruleModalCategory]);
 
   return (
     <div className="w-full bg-[#fef9ef] min-h-screen pb-20">
@@ -43,7 +55,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
               {/* Action Buttons */}
               <div className="flex flex-wrap items-center gap-4 pt-2">
                 <button
-                  onClick={() => onNavigate(isLoggedIn ? 'student-dashboard' : 'register')}
+                  onClick={() => onNavigate(isLoggedIn ? dashboardScreen : 'register')}
                   className="bg-[#0a0a0a] hover:bg-[#0a0a0a]/90 text-white font-semibold px-8 py-3.5 rounded-full flex items-center gap-2 clay-shadow clay-button-active transition-all"
                 >
                   <span>{isLoggedIn ? 'Buka Dashboard' : 'Daftar OPTIMA 2026'}</span>
@@ -292,7 +304,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
               </div>
 
               <button
-                onClick={() => onNavigate(isLoggedIn ? 'student-dashboard' : 'register')}
+                onClick={() => onNavigate(isLoggedIn ? dashboardScreen : 'register')}
                 className="w-full bg-[#0a0a0a] hover:bg-[#0a0a0a]/90 text-white font-bold py-2.5 rounded-lg clay-shadow transition-all text-xs flex items-center justify-center gap-1.5 mt-4"
               >
                 <span>{isLoggedIn ? 'Buka Dashboard' : 'Daftar Kategori SD'}</span>
@@ -336,7 +348,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
               </div>
 
               <button
-                onClick={() => onNavigate(isLoggedIn ? 'student-dashboard' : 'register')}
+                onClick={() => onNavigate(isLoggedIn ? dashboardScreen : 'register')}
                 className="w-full bg-[#0a0a0a] hover:bg-[#0a0a0a]/90 text-white font-bold py-2.5 rounded-lg clay-shadow transition-all text-xs flex items-center justify-center gap-1.5 mt-4"
               >
                 <span>{isLoggedIn ? 'Buka Dashboard' : 'Daftar Kategori SMP'}</span>
@@ -380,12 +392,87 @@ export const LandingView: React.FC<LandingViewProps> = ({
               </div>
 
               <button
-                onClick={() => onNavigate(isLoggedIn ? 'student-dashboard' : 'register')}
+                onClick={() => onNavigate(isLoggedIn ? dashboardScreen : 'register')}
                 className="w-full bg-[#0a0a0a] hover:bg-[#0a0a0a]/90 text-white font-bold py-2.5 rounded-lg clay-shadow transition-all text-xs flex items-center justify-center gap-1.5 mt-4"
               >
                 <span>{isLoggedIn ? 'Buka Dashboard' : 'Daftar Kategori SMA'}</span>
                 <span className="material-symbols-outlined text-xs">arrow_forward</span>
               </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Kisi-Kisi Section */}
+        <div id="kisi-kisi-section" className="text-center mb-16 pt-8 scroll-mt-24 max-w-6xl mx-auto px-4">
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-[#0a0a0a] tracking-tight mb-2">
+            Kisi-Kisi Materi OPTIMA 2026
+          </h2>
+          <p className="text-[#6a6a6a] max-w-lg mx-auto text-xs sm:text-sm mb-8">
+            Cakupan materi yang akan diujikan pada kompetisi OPTIMA 2026 untuk masing-masing tingkatan.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
+            {/* SD / MI */}
+            <div className="bg-white p-6 rounded-[24px] clay-shadow border-2 border-[#a4d4c5] hover:-translate-y-1 transition-transform relative">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-[14px] bg-[#a4d4c5]/20 flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-[#2d735d] text-xl">child_care</span>
+                </div>
+                <h3 className="text-lg font-black text-[#0a0a0a]">SD/MI Sederajat</h3>
+              </div>
+              <ul className="space-y-2 text-sm text-[#0a0a0a]/80 font-medium">
+                <li className="flex items-start gap-2"><span className="text-[#a4d4c5] mt-0.5">•</span><span>Materi bilangan (operasi hitung, FPB, KPK, bilangan prima, dan pola bilangan)</span></li>
+                <li className="flex items-start gap-2"><span className="text-[#a4d4c5] mt-0.5">•</span><span>Pecahan</span></li>
+                <li className="flex items-start gap-2"><span className="text-[#a4d4c5] mt-0.5">•</span><span>Aljabar dasar</span></li>
+                <li className="flex items-start gap-2"><span className="text-[#a4d4c5] mt-0.5">•</span><span>Geometri bangun datar dan bangun ruang</span></li>
+                <li className="flex items-start gap-2"><span className="text-[#a4d4c5] mt-0.5">•</span><span>Pengukuran</span></li>
+                <li className="flex items-start gap-2"><span className="text-[#a4d4c5] mt-0.5">•</span><span>Statistika dan Peluang</span></li>
+                <li className="flex items-start gap-2"><span className="text-[#a4d4c5] mt-0.5">•</span><span>Teori bilangan dan Kombinatorika</span></li>
+                <li className="flex items-start gap-2"><span className="text-[#a4d4c5] mt-0.5">•</span><span>Soal-soal penalaran dan pemecahan masalah</span></li>
+              </ul>
+            </div>
+
+            {/* SMP / MTs */}
+            <div className="bg-white p-6 rounded-[24px] clay-shadow border-2 border-[#ff4d8b] hover:-translate-y-1 transition-transform relative">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-[14px] bg-[#ff4d8b]/10 flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-[#ff4d8b] text-xl">school</span>
+                </div>
+                <h3 className="text-lg font-black text-[#0a0a0a]">SMP/MTs Sederajat</h3>
+              </div>
+              <ul className="space-y-2 text-sm text-[#0a0a0a]/80 font-medium">
+                <li className="flex items-start gap-2"><span className="text-[#ff4d8b] mt-0.5">•</span><span>Operasi hitung aljabar dan Pola bilangan</span></li>
+                <li className="flex items-start gap-2"><span className="text-[#ff4d8b] mt-0.5">•</span><span>Pecahan dan Perhitungan waktu</span></li>
+                <li className="flex items-start gap-2"><span className="text-[#ff4d8b] mt-0.5">•</span><span>Sistem persamaan sederhana</span></li>
+                <li className="flex items-start gap-2"><span className="text-[#ff4d8b] mt-0.5">•</span><span>Diskon dan harga jual</span></li>
+                <li className="flex items-start gap-2"><span className="text-[#ff4d8b] mt-0.5">•</span><span>Perpangkatan dan Persentase keuntungan</span></li>
+                <li className="flex items-start gap-2"><span className="text-[#ff4d8b] mt-0.5">•</span><span>Bangun ruang (luas permukaan)</span></li>
+                <li className="flex items-start gap-2"><span className="text-[#ff4d8b] mt-0.5">•</span><span>Rata-rata (mean)</span></li>
+                <li className="flex items-start gap-2"><span className="text-[#ff4d8b] mt-0.5">•</span><span>Nilai variabel dalam persamaan</span></li>
+                <li className="flex items-start gap-2"><span className="text-[#ff4d8b] mt-0.5">•</span><span>Himpunan, Perbandingan, dan Skala</span></li>
+              </ul>
+            </div>
+
+            {/* SMA / SMK / MA */}
+            <div className="bg-white p-6 rounded-[24px] clay-shadow border-2 border-[#0a0a0a] hover:-translate-y-1 transition-transform relative">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-[14px] bg-[#0a0a0a]/10 flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-[#0a0a0a] text-xl">workspace_premium</span>
+                </div>
+                <h3 className="text-lg font-black text-[#0a0a0a]">SMA/SMK/MA Sederajat</h3>
+              </div>
+              <ul className="space-y-2 text-sm text-[#0a0a0a]/80 font-medium">
+                <li className="flex items-start gap-2"><span className="text-[#0a0a0a] mt-0.5">•</span><span>Polinomial / Suku banyak</span></li>
+                <li className="flex items-start gap-2"><span className="text-[#0a0a0a] mt-0.5">•</span><span>Aljabar</span></li>
+                <li className="flex items-start gap-2"><span className="text-[#0a0a0a] mt-0.5">•</span><span>Fungsi dan Komposisi Fungsi</span></li>
+                <li className="flex items-start gap-2"><span className="text-[#0a0a0a] mt-0.5">•</span><span>Program Linear / Optimasi fungsi Kuadrat</span></li>
+                <li className="flex items-start gap-2"><span className="text-[#0a0a0a] mt-0.5">•</span><span>Integral</span></li>
+                <li className="flex items-start gap-2"><span className="text-[#0a0a0a] mt-0.5">•</span><span>Logaritma dan Eksponen</span></li>
+                <li className="flex items-start gap-2"><span className="text-[#0a0a0a] mt-0.5">•</span><span>Trigonometri</span></li>
+                <li className="flex items-start gap-2"><span className="text-[#0a0a0a] mt-0.5">•</span><span>Kombinatorika dan Teori Bilangan</span></li>
+                <li className="flex items-start gap-2"><span className="text-[#0a0a0a] mt-0.5">•</span><span>Geometri Bidang</span></li>
+                <li className="flex items-start gap-2"><span className="text-[#0a0a0a] mt-0.5">•</span><span>Barisan dan Deret</span></li>
+              </ul>
             </div>
           </div>
         </div>
@@ -542,7 +629,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
                 <button
                   onClick={() => {
                     setRuleModalCategory(null);
-                    onNavigate(isLoggedIn ? 'student-dashboard' : 'register');
+                    onNavigate(isLoggedIn ? dashboardScreen : 'register');
                   }}
                   className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 bg-[#0a0a0a] hover:bg-[#0a0a0a]/90 text-white font-bold py-2.5 px-6 rounded-xl text-xs transition-all"
                 >
