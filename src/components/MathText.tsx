@@ -165,14 +165,40 @@ export const MathText: React.FC<MathTextProps> = ({ text, className = '', inline
   }
 
   if (chunks.length === 0) {
-    return <span className={className}>{decodedText}</span>;
+    return <span className={`whitespace-pre-line ${className}`}>{decodedText}</span>;
+  }
+
+  // Post-process chunks to strip unnecessary empty lines adjacent to block-math
+  const cleanedChunks: { type: 'text' | 'inline-math' | 'block-math'; content: string }[] = [];
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i];
+    if (chunk.type === 'text') {
+      let textContent = chunk.content;
+      const prevIsBlock = i > 0 && chunks[i - 1].type === 'block-math';
+      const nextIsBlock = i < chunks.length - 1 && chunks[i + 1].type === 'block-math';
+
+      if (prevIsBlock) {
+        // Strip 1 leading newline immediately after block math (since block math already starts a new line)
+        textContent = textContent.replace(/^\n/, '');
+      }
+      if (nextIsBlock) {
+        // Strip 1 trailing newline immediately before block math
+        textContent = textContent.replace(/\n$/, '');
+      }
+
+      if (textContent.length > 0) {
+        cleanedChunks.push({ ...chunk, content: textContent });
+      }
+    } else {
+      cleanedChunks.push(chunk);
+    }
   }
 
   const ContainerTag = inline ? 'span' : 'div';
 
   return (
-    <ContainerTag className={`math-rendered-content ${className}`}>
-      {chunks.map((chunk, idx) => {
+    <ContainerTag className={`math-rendered-content whitespace-pre-line ${className}`}>
+      {cleanedChunks.map((chunk, idx) => {
         if (chunk.type === 'text') {
           return <React.Fragment key={idx}>{chunk.content}</React.Fragment>;
         }
@@ -184,7 +210,7 @@ export const MathText: React.FC<MathTextProps> = ({ text, className = '', inline
         return (
           <span
             key={idx}
-            className={isBlock ? 'my-3 block text-center' : 'inline-block px-0.5'}
+            className={isBlock ? 'my-1 block text-center' : 'inline-block px-0.5'}
             dangerouslySetInnerHTML={{ __html: cleanHtml }}
           />
         );

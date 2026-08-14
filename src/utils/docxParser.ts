@@ -59,7 +59,7 @@ export function parseQuestionText(rawText: string): ParsedQuestion[] {
   const finalizeQuestion = () => {
     if (currentQuestionText.length === 0 && currentOptions.length === 0) return;
 
-    const qText = currentQuestionText.join(' ').replace(/^(?:Soal\s*\d+[:.]?|\d+[\.\)]\s+|Q\d+[:.]?)\s*/i, '').trim();
+    const qText = currentQuestionText.join('\n').replace(/^(?:Soal\s*\d+[:.]?|\d+[\.\)]\s+|Q\d+[:.]?)\s*/i, '').trim();
     let isError = false;
     let errorMessage = '';
 
