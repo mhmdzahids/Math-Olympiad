@@ -32,22 +32,6 @@ export default function App() {
   const [authError, setAuthError] = useState<string | null>(null);
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const [showSwitcherBar, setShowSwitcherBar] = useState<boolean>(false);
-
-  // Global Hotkey Listener: Ctrl + ` (backtick) to toggle MathQuest Screen Switcher bar
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && (e.key === '`' || e.code === 'Backquote')) {
-        e.preventDefault();
-        setShowSwitcherBar((prev) => !prev);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, []);
 
   const showToast = (message: string, type: 'success' | 'info' | 'warning' = 'success', title?: string) => {
     const id = `toast-${Date.now()}-${Math.random()}`;
@@ -198,91 +182,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#fef9ef] flex flex-col font-sans antialiased text-[#1d1c16]">
-      {/* Quick Screen Selector Toolbar (Floating Bar at top for instant screen testing — Toggleable via Ctrl + `) */}
-      {showSwitcherBar && (
-        <div className="bg-[#0a0a0a] text-white text-xs py-2 px-4 flex flex-wrap justify-between items-center gap-2 border-b border-white/10 z-50 animate-in slide-in-from-top duration-200">
-          <div className="flex items-center gap-2 font-bold text-[#e8b94a]">
-            <span className="material-symbols-outlined text-[16px]">touch_app</span>
-            <span>MathQuest Screen Switcher:</span>
-            <span className="text-[10px] bg-white/15 text-white/70 px-1.5 py-0.5 rounded-md font-mono border border-white/15">
-              Ctrl + `
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            <button
-              onClick={() => handleNavigate('landing')}
-              className={`px-3 py-1 rounded-full font-semibold transition-all ${
-                currentScreen === 'landing'
-                  ? 'bg-[#ff4d8b] text-white shadow-xs'
-                  : 'bg-white/10 text-white/80 hover:bg-white/20'
-              }`}
-            >
-              1. Landing
-            </button>
-            <button
-              onClick={() => handleNavigate('register')}
-              className={`px-3 py-1 rounded-full font-semibold transition-all ${
-                currentScreen === 'register'
-                  ? 'bg-[#ff6b5a] text-white shadow-xs'
-                  : 'bg-white/10 text-white/80 hover:bg-white/20'
-              }`}
-            >
-              2. Register / Login Page
-            </button>
-            <button
-              onClick={() => handleNavigate('student-dashboard')}
-              className={`px-3 py-1 rounded-full font-semibold transition-all ${
-                currentScreen === 'student-dashboard'
-                  ? 'bg-[#a4d4c5] text-[#0a0a0a] shadow-xs'
-                  : 'bg-white/10 text-white/80 hover:bg-white/20'
-              }`}
-            >
-              3. Student Dashboard
-            </button>
-            <button
-              onClick={() => handleNavigate('quiz')}
-              className={`px-3 py-1 rounded-full font-semibold transition-all ${
-                currentScreen === 'quiz'
-                  ? 'bg-[#feaf83] text-[#0a0a0a] shadow-xs'
-                  : 'bg-white/10 text-white/80 hover:bg-white/20'
-              }`}
-            >
-              4. Quiz Focus Mode
-            </button>
-            <button
-              onClick={() => handleNavigate('admin-rounds')}
-              className={`px-3 py-1 rounded-full font-semibold transition-all ${
-                currentScreen === 'admin-rounds'
-                  ? 'bg-[#b8a4ed] text-[#0a0a0a] shadow-xs'
-                  : 'bg-white/10 text-white/80 hover:bg-white/20'
-              }`}
-            >
-              5. Admin Round Manager
-            </button>
-            <button
-              onClick={() => handleNavigate('admin-leaderboard')}
-              className={`px-3 py-1 rounded-full font-semibold transition-all ${
-                currentScreen === 'admin-leaderboard'
-                  ? 'bg-[#e8b94a] text-[#0a0a0a] shadow-xs'
-                  : 'bg-white/10 text-white/80 hover:bg-white/20'
-              }`}
-            >
-              6. Admin Leaderboard
-            </button>
-            <button
-              onClick={() => handleNavigate('admin-accounts')}
-              className={`px-3 py-1 rounded-full font-semibold transition-all ${
-                currentScreen === 'admin-accounts'
-                  ? 'bg-[#a4d4c5] text-[#0a0a0a] shadow-xs'
-                  : 'bg-white/10 text-white/80 hover:bg-white/20'
-              }`}
-            >
-              7. Kelola Akun
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Shared Navigation Bar */}
       <TopNavbar
         currentScreen={currentScreen}
@@ -425,7 +324,7 @@ export default function App() {
           <div className="relative bg-white max-w-sm w-full rounded-3xl p-6 sm:p-8 clay-shadow z-10 space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-xl font-bold text-[#0a0a0a]">
-                {authModal === 'login' ? 'Login to MathQuest' : 'Create Student Account'}
+                {authModal === 'login' ? 'Masuk ke Akun OPTIMA' : 'Daftar Akun Peserta'}
               </h3>
               <button
                 onClick={() => setAuthModal(null)}

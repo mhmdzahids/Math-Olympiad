@@ -26,15 +26,19 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
   const [regType, setRegType] = useState<'individu' | 'guru'>('individu');
 
   // Individu fields
-  const [fullName, setFullName] = useState('Andi Pratama');
-  const [email, setEmail] = useState('andi@sekolah.sch.id');
-  const [password, setPassword] = useState('••••••••');
-  const [school, setSchool] = useState('SMA Negeri 1 Cirebon');
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [school, setSchool] = useState('');
   const [category, setCategory] = useState<'SD' | 'SMP' | 'SMA'>('SMA');
-  const [grade, setGrade] = useState('Kelas 10 (SMA)');
+  const [grade, setGrade] = useState('Kelas 10 (SMA/SMK)');
 
   // Guru / Kolektif fields
-  const [teacherName, setTeacherName] = useState('Bpk. Budi Santoso, S.Pd.');
+  const [teacherName, setTeacherName] = useState('');
   const [teacherPhone, setTeacherPhone] = useState('');
   const [studentsList, setStudentsList] = useState<Array<{ id: string; name: string; category: 'SD' | 'SMP' | 'SMA'; grade: string }>>([
     { id: '1', name: '', category: 'SD', grade: '' },
@@ -115,6 +119,17 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
     if (activeTab === 'login') {
       await executeLogin(email, password);
       return;
+    }
+
+    if (regType === 'individu') {
+      if (!password || password.length < 6) {
+        setErrorMessage('Kata sandi minimal harus 6 karakter.');
+        return;
+      }
+      if (password !== confirmPassword) {
+        setErrorMessage('Konfirmasi kata sandi tidak cocok. Pastikan kedua kolom kata sandi sama.');
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -301,7 +316,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
 
                 {regType === 'individu' ? (
                   <div className="space-y-6">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                       <div>
                         <label className="block text-xs font-bold text-[#0a0a0a] uppercase tracking-wider mb-2">
                           Nama Lengkap Peserta
@@ -309,6 +324,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
                         <input
                           type="text"
                           required
+                          value={fullName}
                           onChange={(e) => setFullName(e.target.value)}
                           placeholder="cth. Andi Pratama"
                           className="w-full bg-[#fffaf0] border-2 border-[#0a0a0a]/15 rounded-xl px-4 py-3 text-sm font-semibold text-[#0a0a0a] focus:outline-none focus:border-[#0a0a0a]"
@@ -322,36 +338,102 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
                         <input
                           type="email"
                           required
+                          value={email}
                           onChange={(e) => setEmail(e.target.value)}
-                          placeholder="andi@sekolah.sch.id"
+                          placeholder="peserta@sekolah.sch.id"
                           className="w-full bg-[#fffaf0] border-2 border-[#0a0a0a]/15 rounded-xl px-4 py-3 text-sm font-semibold text-[#0a0a0a] focus:outline-none focus:border-[#0a0a0a]"
                         />
                       </div>
 
-                      <div>
-                        <label className="block text-xs font-bold text-[#0a0a0a] uppercase tracking-wider mb-2">
-                          Kata Sandi Akun
-                        </label>
-                        <input
-                          type="password"
-                          required
-                          onChange={(e) => setPassword(e.target.value)}
-                          placeholder="••••••••"
-                          className="w-full bg-[#fffaf0] border-2 border-[#0a0a0a]/15 rounded-xl px-4 py-3 text-sm font-semibold text-[#0a0a0a] focus:outline-none focus:border-[#0a0a0a]"
-                        />
-                      </div>
-
-                      <div>
+                      <div className="sm:col-span-2">
                         <label className="block text-xs font-bold text-[#0a0a0a] uppercase tracking-wider mb-2">
                           Asal Sekolah
                         </label>
                         <input
                           type="text"
                           required
+                          value={school}
                           onChange={(e) => setSchool(e.target.value)}
-                          placeholder="SMAN 1 Cirebon"
+                          placeholder="cth. SMAN 1 Cirebon"
                           className="w-full bg-[#fffaf0] border-2 border-[#0a0a0a]/15 rounded-xl px-4 py-3 text-sm font-semibold text-[#0a0a0a] focus:outline-none focus:border-[#0a0a0a]"
                         />
+                      </div>
+
+                      {/* Password Input with Eye Toggle */}
+                      <div>
+                        <label className="block text-xs font-bold text-[#0a0a0a] uppercase tracking-wider mb-2">
+                          Kata Sandi Akun
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showPassword ? 'text' : 'password'}
+                            required
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="Minimal 6 karakter"
+                            className="w-full bg-[#fffaf0] border-2 border-[#0a0a0a]/15 rounded-xl pl-4 pr-11 py-3 text-sm font-semibold text-[#0a0a0a] focus:outline-none focus:border-[#0a0a0a]"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6a6a6a] hover:text-[#0a0a0a] p-1 transition-colors cursor-pointer"
+                            title={showPassword ? 'Sembunyikan Kata Sandi' : 'Tampilkan Kata Sandi'}
+                          >
+                            <span className="material-symbols-outlined text-[20px]">
+                              {showPassword ? 'visibility_off' : 'visibility'}
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Confirm Password Input with Eye Toggle & Live Checking */}
+                      <div>
+                        <label className="block text-xs font-bold text-[#0a0a0a] uppercase tracking-wider mb-2">
+                          Konfirmasi Kata Sandi
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showConfirmPassword ? 'text' : 'password'}
+                            required
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            placeholder="Ulangi kata sandi"
+                            className={`w-full bg-[#fffaf0] border-2 rounded-xl pl-4 pr-11 py-3 text-sm font-semibold text-[#0a0a0a] transition-all focus:outline-none ${
+                              confirmPassword.length === 0
+                                ? 'border-[#0a0a0a]/15 focus:border-[#0a0a0a]'
+                                : password === confirmPassword
+                                  ? 'border-[#0f5236] bg-[#a4d4c5]/15 ring-2 ring-[#a4d4c5]/40 focus:border-[#0f5236]'
+                                  : 'border-[#ba1a1a] bg-[#ffdad6]/25 ring-2 ring-[#ba1a1a]/30 focus:border-[#ba1a1a]'
+                            }`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6a6a6a] hover:text-[#0a0a0a] p-1 transition-colors cursor-pointer"
+                            title={showConfirmPassword ? 'Sembunyikan Kata Sandi' : 'Tampilkan Kata Sandi'}
+                          >
+                            <span className="material-symbols-outlined text-[20px]">
+                              {showConfirmPassword ? 'visibility_off' : 'visibility'}
+                            </span>
+                          </button>
+                        </div>
+
+                        {/* Live Validation Feedback */}
+                        {confirmPassword.length > 0 && (
+                          <div className="mt-1.5 flex items-center gap-1.5 text-xs font-bold transition-all">
+                            {password === confirmPassword ? (
+                              <div className="text-[#0f5236] flex items-center gap-1">
+                                <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                                <span>Kata sandi cocok</span>
+                              </div>
+                            ) : (
+                              <div className="text-[#ba1a1a] flex items-center gap-1">
+                                <span className="material-symbols-outlined text-[16px]">cancel</span>
+                                <span>Kata sandi tidak cocok</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -582,52 +664,32 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
                   <input
                     type="email"
                     required
+                    value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="peserta@sekolah.sch.id"
-                    className="w-full bg-[#fffaf0] border-2 border-[#0a0a0a]/15 rounded-xl px-4 py-3 text-sm font-semibold"
+                    className="w-full bg-[#fffaf0] border-2 border-[#0a0a0a]/15 rounded-xl px-4 py-3 text-sm font-semibold text-[#0a0a0a] focus:outline-none focus:border-[#0a0a0a]"
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-[#0a0a0a] uppercase mb-1">Kata Sandi</label>
-                  <input
-                    type="password"
-                    required
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full bg-[#fffaf0] border-2 border-[#0a0a0a]/15 rounded-xl px-4 py-3 text-sm font-semibold"
-                  />
-                </div>
-
-                {/* Demo Accounts Quick Login Selector */}
-                <div className="bg-[#f8f3e9] p-3.5 rounded-2xl border border-[#0a0a0a]/10 space-y-2 mt-4">
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-[#6a6a6a] flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-sm text-[#e8b94a]">bolt</span>
-                    <span>Uji Coba Akun Demo (Satu Klik):</span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="relative">
+                    <input
+                      type={showLoginPassword ? 'text' : 'password'}
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full bg-[#fffaf0] border-2 border-[#0a0a0a]/15 rounded-xl pl-4 pr-11 py-3 text-sm font-semibold text-[#0a0a0a] focus:outline-none focus:border-[#0a0a0a]"
+                    />
                     <button
                       type="button"
-                      onClick={() => {
-                        setEmail('admin@matholympiad.id');
-                        setPassword('admin123');
-                        executeLogin('admin@matholympiad.id', 'admin123');
-                      }}
-                      className="bg-[#b8a4ed]/30 hover:bg-[#b8a4ed]/50 text-[#0a0a0a] text-xs font-bold py-2.5 px-3 rounded-xl border border-[#0a0a0a]/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      onClick={() => setShowLoginPassword(!showLoginPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6a6a6a] hover:text-[#0a0a0a] p-1 transition-colors cursor-pointer"
+                      title={showLoginPassword ? 'Sembunyikan Kata Sandi' : 'Tampilkan Kata Sandi'}
                     >
-                      <span className="material-symbols-outlined text-base text-[#6b42c9]">admin_panel_settings</span>
-                      <span>Masuk sebagai Admin</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEmail('andi@sekolah.sch.id');
-                        setPassword('peserta123');
-                        executeLogin('andi@sekolah.sch.id', 'peserta123');
-                      }}
-                      className="bg-[#a4d4c5]/30 hover:bg-[#a4d4c5]/50 text-[#0a0a0a] text-xs font-bold py-2.5 px-3 rounded-xl border border-[#0a0a0a]/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-base text-[#1a3a3a]">school</span>
-                      <span>Masuk sebagai Peserta</span>
+                      <span className="material-symbols-outlined text-[20px]">
+                        {showLoginPassword ? 'visibility_off' : 'visibility'}
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -643,15 +705,15 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
 
             <button
               type="submit"
-              disabled={isSubmitting}
-              className="w-full bg-[#0a0a0a] hover:bg-[#0a0a0a]/90 text-white font-bold py-4 rounded-2xl clay-shadow transition-all text-base flex items-center justify-center gap-2"
+              disabled={isSubmitting || (activeTab === 'register' && regType === 'individu' && confirmPassword.length > 0 && password !== confirmPassword)}
+              className="w-full bg-[#0a0a0a] hover:bg-[#0a0a0a]/90 text-white font-bold py-4 rounded-2xl clay-shadow transition-all text-base flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
               {isSubmitting ? (
-                <span>Memproses Pendaftaran...</span>
+                <span>Memproses...</span>
               ) : activeTab === 'register' ? (
-                <span>Kirim &amp; Lanjut ke Dashboard</span>
+                <span>Daftar</span>
               ) : (
-                <span>Masuk ke Dashboard Kuis</span>
+                <span>Masuk Akun</span>
               )}
             </button>
           </form>
